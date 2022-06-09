@@ -1,13 +1,12 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\initializer;
+namespace mftd\initializer;
 
-use think\App;
-use think\service\ModelService;
-use think\service\PaginatorService;
-use think\service\ValidateService;
+use mftd\App;
+use mftd\service\ModelService;
+use mftd\service\PaginatorService;
+use mftd\service\ValidateService;
 
 /**
  * 注册系统服务

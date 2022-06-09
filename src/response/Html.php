@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\response;
+namespace mftd\response;
 
-use think\Cookie;
-use think\Response;
+use mftd\Cookie;
+use mftd\Response;
 
 /**
  * Html Response

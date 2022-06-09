@@ -1,19 +1,25 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\model\concern;
+namespace mftd\model\concern;
 
-use think\db\exception\DbException as Exception;
+use mftd\db\exception\DbException as Exception;
 
 /**
  * 乐观锁
  */
 trait OptimLock
 {
-    protected function getOptimLockField()
+    public function getWhere()
     {
-        return property_exists($this, 'optimLock') && isset($this->optimLock) ? $this->optimLock : 'lock_version';
+        $where = parent::getWhere();
+        $optimLock = $this->getOptimLockField();
+
+        if ($optimLock && $lockVer = $this->getOrigin($optimLock)) {
+            $where[] = [$optimLock, '=', $lockVer];
+        }
+
+        return $where;
     }
 
     /**
@@ -24,6 +30,18 @@ trait OptimLock
     protected function checkData(): void
     {
         $this->isExists() ? $this->updateLockVersion() : $this->recordLockVersion();
+    }
+
+    protected function checkResult($result): void
+    {
+        if (!$result) {
+            throw new Exception('record has update');
+        }
+    }
+
+    protected function getOptimLockField()
+    {
+        return property_exists($this, 'optimLock') && isset($this->optimLock) ? $this->optimLock : 'lock_version';
     }
 
     /**
@@ -52,25 +70,6 @@ trait OptimLock
         if ($optimLock && $lockVer = $this->getOrigin($optimLock)) {
             // 更新乐观锁
             $this->set($optimLock, $lockVer + 1);
-        }
-    }
-
-    public function getWhere()
-    {
-        $where     = parent::getWhere();
-        $optimLock = $this->getOptimLockField();
-
-        if ($optimLock && $lockVer = $this->getOrigin($optimLock)) {
-            $where[] = [$optimLock, '=', $lockVer];
-        }
-
-        return $where;
-    }
-
-    protected function checkResult($result): void
-    {
-        if (!$result) {
-            throw new Exception('record has update');
         }
     }
 }

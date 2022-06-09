@@ -1,16 +1,25 @@
 <?php
 
-namespace think\console\command;
+namespace mftd\console\command;
 
-use think\console\Command;
-use think\console\Input;
-use think\console\input\Argument as InputArgument;
-use think\console\input\Option as InputOption;
-use think\console\Output;
+use mftd\console\Command;
+use mftd\console\Input;
+use mftd\console\input\Argument as InputArgument;
+use mftd\console\input\Option as InputOption;
+use mftd\console\Output;
 
 class Help extends Command
 {
     private $command;
+
+    /**
+     * Sets the command.
+     * @param Command $command The command to set
+     */
+    public function setCommand(Command $command): void
+    {
+        $this->command = $command;
+    }
 
     /**
      * {@inheritdoc}
@@ -31,15 +40,6 @@ The <info>%command.name%</info> command displays help for a given command:
 To display the list of available commands, please use the <info>list</info> command.
 EOF
         );
-    }
-
-    /**
-     * Sets the command.
-     * @param Command $command The command to set
-     */
-    public function setCommand(Command $command): void
-    {
-        $this->command = $command;
     }
 
     /**

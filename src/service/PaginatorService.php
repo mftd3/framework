@@ -1,25 +1,17 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\service;
+namespace mftd\service;
 
-use think\Paginator;
-use think\paginator\driver\Bootstrap;
-use think\Service;
+use mftd\Paginator;
+use mftd\paginator\driver\Bootstrap;
+use mftd\Service;
 
 /**
  * 分页服务类
  */
 class PaginatorService extends Service
 {
-    public function register()
-    {
-        if (!$this->app->bound(Paginator::class)) {
-            $this->app->bind(Paginator::class, Bootstrap::class);
-        }
-    }
-
     public function boot()
     {
         Paginator::maker(function (...$args) {
@@ -33,11 +25,18 @@ class PaginatorService extends Service
         Paginator::currentPageResolver(function ($varPage = 'page') {
             $page = $this->app->request->param($varPage);
 
-            if (filter_var($page, FILTER_VALIDATE_INT) !== false && (int) $page >= 1) {
-                return (int) $page;
+            if (filter_var($page, FILTER_VALIDATE_INT) !== false && (int)$page >= 1) {
+                return (int)$page;
             }
 
             return 1;
         });
+    }
+
+    public function register()
+    {
+        if (!$this->app->bound(Paginator::class)) {
+            $this->app->bind(Paginator::class, Bootstrap::class);
+        }
     }
 }

@@ -1,74 +1,48 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
 use InvalidArgumentException;
+use mftd\event\LogWrite;
+use mftd\helper\Arr;
+use mftd\log\Channel;
+use mftd\log\ChannelSet;
 use Psr\Log\LoggerInterface;
-use think\event\LogWrite;
-use think\helper\Arr;
-use think\log\Channel;
-use think\log\ChannelSet;
 
 /**
  * 日志管理类
- * @package think
+ * @package mftd
  * @mixin Channel
  */
 class Log extends Manager implements LoggerInterface
 {
+    public const ALERT = 'alert';
+    public const CRITICAL = 'critical';
+    public const DEBUG = 'debug';
     public const EMERGENCY = 'emergency';
-    public const ALERT     = 'alert';
-    public const CRITICAL  = 'critical';
-    public const ERROR     = 'error';
-    public const WARNING   = 'warning';
-    public const NOTICE    = 'notice';
-    public const INFO      = 'info';
-    public const DEBUG     = 'debug';
-    public const SQL       = 'sql';
+    public const ERROR = 'error';
+    public const INFO = 'info';
+    public const NOTICE = 'notice';
+    public const SQL = 'sql';
+    public const WARNING = 'warning';
+    protected $namespace = '\\mftd\\log\\driver\\';
 
-    protected $namespace = '\\think\\log\\driver\\';
-
-    /**
-     * 默认驱动
-     * @return string|null
-     */
-    public function getDefaultDriver()
+    public function __call($method, $parameters)
     {
-        return $this->getConfig('default');
+        $this->log($method, ...$parameters);
     }
 
     /**
-     * 获取日志配置
+     * 记录警报信息
      * @access public
-     * @param null|string $name    名称
-     * @param mixed       $default 默认值
-     * @return mixed
+     * @param mixed $message 日志信息
+     * @param array $context 替换内容
+     * @return void
      */
-    public function getConfig(string $name = null, $default = null)
+    public function alert($message, array $context = []): void
     {
-        if (!is_null($name)) {
-            return $this->app->config->get('log.' . $name, $default);
-        }
-
-        return $this->app->config->get('log');
-    }
-
-    /**
-     * 获取渠道配置
-     * @param string $channel
-     * @param null   $name
-     * @param null   $default
-     * @return array
-     */
-    public function getChannelConfig($channel, $name = null, $default = null)
-    {
-        if ($config = $this->getConfig("channels.{$channel}")) {
-            return Arr::get($config, $name, $default);
-        }
-
-        throw new InvalidArgumentException("Channel [$channel] not found.");
+        $this->log(__FUNCTION__, $message, $context);
     }
 
     /**
@@ -83,26 +57,6 @@ class Log extends Manager implements LoggerInterface
         }
 
         return $this->driver($name);
-    }
-
-    protected function resolveType(string $name)
-    {
-        return $this->getChannelConfig($name, 'type', 'file');
-    }
-
-    public function createDriver(string $name)
-    {
-        $driver = parent::createDriver($name);
-
-        $lazy  = !$this->getChannelConfig($name, "realtime_write", false) && !$this->app->runningInConsole();
-        $allow = array_merge($this->getConfig("level", []), $this->getChannelConfig($name, "level", []));
-
-        return new Channel($name, $driver, $allow, $lazy, $this->app->event);
-    }
-
-    protected function resolveConfig(string $name)
-    {
-        return $this->getChannelConfig($name);
     }
 
     /**
@@ -139,6 +93,105 @@ class Log extends Manager implements LoggerInterface
         return $this;
     }
 
+    public function createDriver(string $name)
+    {
+        $driver = parent::createDriver($name);
+
+        $lazy = !$this->getChannelConfig($name, "realtime_write", false) && !$this->app->runningInConsole();
+        $allow = array_merge($this->getConfig("level", []), $this->getChannelConfig($name, "level", []));
+
+        return new Channel($name, $driver, $allow, $lazy, $this->app->event);
+    }
+
+    /**
+     * 记录紧急情况
+     * @access public
+     * @param mixed $message 日志信息
+     * @param array $context 替换内容
+     * @return void
+     */
+    public function critical($message, array $context = []): void
+    {
+        $this->log(__FUNCTION__, $message, $context);
+    }
+
+    /**
+     * 记录调试信息
+     * @access public
+     * @param mixed $message 日志信息
+     * @param array $context 替换内容
+     * @return void
+     */
+    public function debug($message, array $context = []): void
+    {
+        $this->log(__FUNCTION__, $message, $context);
+    }
+
+    /**
+     * 记录emergency信息
+     * @access public
+     * @param mixed $message 日志信息
+     * @param array $context 替换内容
+     * @return void
+     */
+    public function emergency($message, array $context = []): void
+    {
+        $this->log(__FUNCTION__, $message, $context);
+    }
+
+    /**
+     * 记录错误信息
+     * @access public
+     * @param mixed $message 日志信息
+     * @param array $context 替换内容
+     * @return void
+     */
+    public function error($message, array $context = []): void
+    {
+        $this->log(__FUNCTION__, $message, $context);
+    }
+
+    /**
+     * 获取渠道配置
+     * @param string $channel
+     * @param null $name
+     * @param null $default
+     * @return array
+     */
+    public function getChannelConfig($channel, $name = null, $default = null)
+    {
+        if ($config = $this->getConfig("channels.{$channel}")) {
+            return Arr::get($config, $name, $default);
+        }
+
+        throw new InvalidArgumentException("Channel [$channel] not found.");
+    }
+
+    /**
+     * 获取日志配置
+     * @access public
+     * @param null|string $name 名称
+     * @param mixed $default 默认值
+     * @return mixed
+     */
+    public function getConfig(string $name = null, $default = null)
+    {
+        if (!is_null($name)) {
+            return $this->app->config->get('log.' . $name, $default);
+        }
+
+        return $this->app->config->get('log');
+    }
+
+    /**
+     * 默认驱动
+     * @return string|null
+     */
+    public function getDefaultDriver()
+    {
+        return $this->getConfig('default');
+    }
+
     /**
      * 获取日志信息
      * @access public
@@ -148,6 +201,71 @@ class Log extends Manager implements LoggerInterface
     public function getLog(string $channel = null): array
     {
         return $this->channel($channel)->getLog();
+    }
+
+    /**
+     * 记录一般信息
+     * @access public
+     * @param mixed $message 日志信息
+     * @param array $context 替换内容
+     * @return void
+     */
+    public function info($message, array $context = []): void
+    {
+        $this->log(__FUNCTION__, $message, $context);
+    }
+
+    /**
+     * 注册日志写入事件监听
+     * @param $listener
+     * @return Event
+     */
+    public function listen($listener)
+    {
+        return $this->app->event->listen(LogWrite::class, $listener);
+    }
+
+    /**
+     * 记录日志信息
+     * @access public
+     * @param string $level 日志级别
+     * @param mixed $message 日志信息
+     * @param array $context 替换内容
+     * @return void
+     */
+    public function log($level, $message, array $context = []): void
+    {
+        $this->record($message, $level, $context);
+    }
+
+    /**
+     * 记录notice信息
+     * @access public
+     * @param mixed $message 日志信息
+     * @param array $context 替换内容
+     * @return void
+     */
+    public function notice($message, array $context = []): void
+    {
+        $this->log(__FUNCTION__, $message, $context);
+    }
+
+    /**
+     * 记录日志信息
+     * @access public
+     * @param mixed $msg 日志信息
+     * @param string $type 日志级别
+     * @param array $context 替换内容
+     * @param bool $lazy
+     * @return $this
+     */
+    public function record($msg, string $type = 'info', array $context = [], bool $lazy = true)
+    {
+        $channel = $this->getConfig('type_channel.' . $type);
+
+        $this->channel($channel)->record($msg, $type, $context, $lazy);
+
+        return $this;
     }
 
     /**
@@ -166,103 +284,13 @@ class Log extends Manager implements LoggerInterface
     }
 
     /**
-     * 记录日志信息
-     * @access public
-     * @param mixed  $msg     日志信息
-     * @param string $type    日志级别
-     * @param array  $context 替换内容
-     * @param bool   $lazy
-     * @return $this
-     */
-    public function record($msg, string $type = 'info', array $context = [], bool $lazy = true)
-    {
-        $channel = $this->getConfig('type_channel.' . $type);
-
-        $this->channel($channel)->record($msg, $type, $context, $lazy);
-
-        return $this;
-    }
-
-    /**
-     * 实时写入日志信息
-     * @access public
-     * @param mixed  $msg     调试信息
-     * @param string $type    日志级别
-     * @param array  $context 替换内容
-     * @return $this
-     */
-    public function write($msg, string $type = 'info', array $context = [])
-    {
-        return $this->record($msg, $type, $context, false);
-    }
-
-    /**
-     * 注册日志写入事件监听
-     * @param $listener
-     * @return Event
-     */
-    public function listen($listener)
-    {
-        return $this->app->event->listen(LogWrite::class, $listener);
-    }
-
-    /**
-     * 记录日志信息
-     * @access public
-     * @param string $level   日志级别
-     * @param mixed  $message 日志信息
-     * @param array  $context 替换内容
-     * @return void
-     */
-    public function log($level, $message, array $context = []): void
-    {
-        $this->record($message, $level, $context);
-    }
-
-    /**
-     * 记录emergency信息
+     * 记录sql信息
      * @access public
      * @param mixed $message 日志信息
      * @param array $context 替换内容
      * @return void
      */
-    public function emergency($message, array $context = []): void
-    {
-        $this->log(__FUNCTION__, $message, $context);
-    }
-
-    /**
-     * 记录警报信息
-     * @access public
-     * @param mixed $message 日志信息
-     * @param array $context 替换内容
-     * @return void
-     */
-    public function alert($message, array $context = []): void
-    {
-        $this->log(__FUNCTION__, $message, $context);
-    }
-
-    /**
-     * 记录紧急情况
-     * @access public
-     * @param mixed $message 日志信息
-     * @param array $context 替换内容
-     * @return void
-     */
-    public function critical($message, array $context = []): void
-    {
-        $this->log(__FUNCTION__, $message, $context);
-    }
-
-    /**
-     * 记录错误信息
-     * @access public
-     * @param mixed $message 日志信息
-     * @param array $context 替换内容
-     * @return void
-     */
-    public function error($message, array $context = []): void
+    public function sql($message, array $context = []): void
     {
         $this->log(__FUNCTION__, $message, $context);
     }
@@ -280,55 +308,25 @@ class Log extends Manager implements LoggerInterface
     }
 
     /**
-     * 记录notice信息
+     * 实时写入日志信息
      * @access public
-     * @param mixed $message 日志信息
+     * @param mixed $msg 调试信息
+     * @param string $type 日志级别
      * @param array $context 替换内容
-     * @return void
+     * @return $this
      */
-    public function notice($message, array $context = []): void
+    public function write($msg, string $type = 'info', array $context = [])
     {
-        $this->log(__FUNCTION__, $message, $context);
+        return $this->record($msg, $type, $context, false);
     }
 
-    /**
-     * 记录一般信息
-     * @access public
-     * @param mixed $message 日志信息
-     * @param array $context 替换内容
-     * @return void
-     */
-    public function info($message, array $context = []): void
+    protected function resolveConfig(string $name)
     {
-        $this->log(__FUNCTION__, $message, $context);
+        return $this->getChannelConfig($name);
     }
 
-    /**
-     * 记录调试信息
-     * @access public
-     * @param mixed $message 日志信息
-     * @param array $context 替换内容
-     * @return void
-     */
-    public function debug($message, array $context = []): void
+    protected function resolveType(string $name)
     {
-        $this->log(__FUNCTION__, $message, $context);
-    }
-
-    /**
-     * 记录sql信息
-     * @access public
-     * @param mixed $message 日志信息
-     * @param array $context 替换内容
-     * @return void
-     */
-    public function sql($message, array $context = []): void
-    {
-        $this->log(__FUNCTION__, $message, $context);
-    }
-
-    public function __call($method, $parameters)
-    {
-        $this->log($method, ...$parameters);
+        return $this->getChannelConfig($name, 'type', 'file');
     }
 }

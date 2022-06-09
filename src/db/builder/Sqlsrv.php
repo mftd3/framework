@@ -1,11 +1,11 @@
 <?php
 
-namespace think\db\builder;
+namespace mftd\db\builder;
 
-use think\db\Builder;
-use think\db\exception\DbException as Exception;
-use think\db\Query;
-use think\db\Raw;
+use mftd\db\Builder;
+use mftd\db\exception\DbException as Exception;
+use mftd\db\Query;
+use mftd\db\Raw;
 
 /**
  * Sqlsrv数据库驱动
@@ -13,16 +13,30 @@ use think\db\Raw;
 class Sqlsrv extends Builder
 {
     /**
-     * SELECT SQL表达式
+     * DELETE SQL表达式
      * @var string
      */
-    protected $selectSql = 'SELECT T1.* FROM (SELECT thinkphp.*, ROW_NUMBER() OVER (%ORDER%) AS ROW_NUMBER FROM (SELECT %DISTINCT% %FIELD% FROM %TABLE%%JOIN%%WHERE%%GROUP%%HAVING%) AS thinkphp) AS T1 %LIMIT%%COMMENT%';
+    protected $deleteSql = 'DELETE FROM %TABLE% %USING% FROM %TABLE% %JOIN% %WHERE% %LIMIT% %LOCK%%COMMENT%';
+    /**
+     * INSERT ALL SQL表达式
+     * @var string
+     */
+    protected $insertAllSql = 'INSERT INTO %TABLE% (%FIELD%) %DATA% %COMMENT%';
+    /**
+     * INSERT SQL表达式
+     * @var string
+     */
+    protected $insertSql = 'INSERT INTO %TABLE% (%FIELD%) VALUES (%DATA%) %COMMENT%';
     /**
      * SELECT INSERT SQL表达式
      * @var string
      */
     protected $selectInsertSql = 'SELECT %DISTINCT% %FIELD% FROM %TABLE%%JOIN%%WHERE%%GROUP%%HAVING%';
-
+    /**
+     * SELECT SQL表达式
+     * @var string
+     */
+    protected $selectSql = 'SELECT T1.* FROM (SELECT mftdphp.*, ROW_NUMBER() OVER (%ORDER%) AS ROW_NUMBER FROM (SELECT %DISTINCT% %FIELD% FROM %TABLE%%JOIN%%WHERE%%GROUP%%HAVING%) AS mftdphp) AS T1 %LIMIT%%COMMENT%';
     /**
      * UPDATE SQL表达式
      * @var string
@@ -30,81 +44,17 @@ class Sqlsrv extends Builder
     protected $updateSql = 'UPDATE %TABLE% SET %SET% FROM %TABLE% %JOIN% %WHERE% %LIMIT% %LOCK%%COMMENT%';
 
     /**
-     * DELETE SQL表达式
-     * @var string
-     */
-    protected $deleteSql = 'DELETE FROM %TABLE% %USING% FROM %TABLE% %JOIN% %WHERE% %LIMIT% %LOCK%%COMMENT%';
-
-    /**
-     * INSERT SQL表达式
-     * @var string
-     */
-    protected $insertSql = 'INSERT INTO %TABLE% (%FIELD%) VALUES (%DATA%) %COMMENT%';
-
-    /**
-     * INSERT ALL SQL表达式
-     * @var string
-     */
-    protected $insertAllSql = 'INSERT INTO %TABLE% (%FIELD%) %DATA% %COMMENT%';
-
-    /**
-     * order分析
-     * @access protected
-     * @param  Query     $query        查询对象
-     * @param  mixed     $order
-     * @return string
-     */
-    protected function parseOrder(Query $query, array $order): string
-    {
-        if (empty($order)) {
-            return ' ORDER BY rand()';
-        }
-
-        $array = [];
-
-        foreach ($order as $key => $val) {
-            if ($val instanceof Raw) {
-                $array[] = $this->parseRaw($query, $val);
-            } elseif ('[rand]' == $val) {
-                $array[] = $this->parseRand($query);
-            } else {
-                if (is_numeric($key)) {
-                    [$key, $sort] = explode(' ', strpos($val, ' ') ? $val : $val . ' ');
-                } else {
-                    $sort = $val;
-                }
-
-                $sort    = in_array(strtolower($sort), ['asc', 'desc'], true) ? ' ' . $sort : '';
-                $array[] = $this->parseKey($query, $key, true) . $sort;
-            }
-        }
-
-        return ' ORDER BY ' . implode(',', $array);
-    }
-
-    /**
-     * 随机排序
-     * @access protected
-     * @param  Query     $query        查询对象
-     * @return string
-     */
-    protected function parseRand(Query $query): string
-    {
-        return 'rand()';
-    }
-
-    /**
      * 字段和表名处理
      * @access public
-     * @param  Query     $query     查询对象
-     * @param  mixed     $key       字段名
-     * @param  bool      $strict   严格检测
+     * @param Query $query 查询对象
+     * @param mixed $key 字段名
+     * @param bool $strict 严格检测
      * @return string
      */
     public function parseKey(Query $query, $key, bool $strict = false): string
     {
         if (is_int($key)) {
-            return (string) $key;
+            return (string)$key;
         } elseif ($key instanceof Raw) {
             return $this->parseRaw($query, $key);
         }
@@ -141,11 +91,18 @@ class Sqlsrv extends Builder
         return $key;
     }
 
+    public function selectInsert(Query $query, array $fields, string $table): string
+    {
+        $this->selectSql = $this->selectInsertSql;
+
+        return parent::selectInsert($query, $fields, $table);
+    }
+
     /**
      * limit
      * @access protected
-     * @param  Query     $query        查询对象
-     * @param  mixed     $limit
+     * @param Query $query 查询对象
+     * @param mixed $limit
      * @return string
      */
     protected function parseLimit(Query $query, string $limit): string
@@ -165,10 +122,49 @@ class Sqlsrv extends Builder
         return 'WHERE ' . $limitStr;
     }
 
-    public function selectInsert(Query $query, array $fields, string $table): string
+    /**
+     * order分析
+     * @access protected
+     * @param Query $query 查询对象
+     * @param mixed $order
+     * @return string
+     */
+    protected function parseOrder(Query $query, array $order): string
     {
-        $this->selectSql = $this->selectInsertSql;
+        if (empty($order)) {
+            return ' ORDER BY rand()';
+        }
 
-        return parent::selectInsert($query, $fields, $table);
+        $array = [];
+
+        foreach ($order as $key => $val) {
+            if ($val instanceof Raw) {
+                $array[] = $this->parseRaw($query, $val);
+            } elseif ('[rand]' == $val) {
+                $array[] = $this->parseRand($query);
+            } else {
+                if (is_numeric($key)) {
+                    [$key, $sort] = explode(' ', strpos($val, ' ') ? $val : $val . ' ');
+                } else {
+                    $sort = $val;
+                }
+
+                $sort = in_array(strtolower($sort), ['asc', 'desc'], true) ? ' ' . $sort : '';
+                $array[] = $this->parseKey($query, $key, true) . $sort;
+            }
+        }
+
+        return ' ORDER BY ' . implode(',', $array);
+    }
+
+    /**
+     * 随机排序
+     * @access protected
+     * @param Query $query 查询对象
+     * @return string
+     */
+    protected function parseRand(Query $query): string
+    {
+        return 'rand()';
     }
 }

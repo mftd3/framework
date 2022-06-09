@@ -1,19 +1,18 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\console\command;
+namespace mftd\console\command;
 
-use think\console\Command;
-use think\console\Input;
-use think\console\Output;
+use mftd\console\Command;
+use mftd\console\Input;
+use mftd\console\Output;
 
 class ServiceDiscover extends Command
 {
     public function configure()
     {
         $this->setName('service:discover')
-            ->setDescription('Discover Services for ThinkPHP');
+            ->setDescription('Discover Services for mftdPHP');
     }
 
     public function execute(Input $input, Output $output)
@@ -27,8 +26,8 @@ class ServiceDiscover extends Command
 
             $services = [];
             foreach ($packages as $package) {
-                if (!empty($package['extra']['think']['services'])) {
-                    $services = array_merge($services, (array) $package['extra']['think']['services']);
+                if (!empty($package['extra']['mftd']['services'])) {
+                    $services = array_merge($services, (array)$package['extra']['mftd']['services']);
                 }
             }
 

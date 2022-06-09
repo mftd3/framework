@@ -1,21 +1,22 @@
 <?php
 
-namespace think\console\output\question;
+namespace mftd\console\output\question;
 
-use think\console\output\Question;
+use InvalidArgumentException;
+use mftd\console\output\Question;
 
 class Choice extends Question
 {
     private $choices;
-    private $multiselect  = false;
-    private $prompt       = ' > ';
     private $errorMessage = 'Value "%s" is invalid';
+    private $multiselect = false;
+    private $prompt = ' > ';
 
     /**
      * 构造方法
      * @param string $question 问题
-     * @param array  $choices  选项
-     * @param mixed  $default  默认答案
+     * @param array $choices 选项
+     * @param mixed $default 默认答案
      */
     public function __construct($question, array $choices, $default = null)
     {
@@ -36,24 +37,6 @@ class Choice extends Question
     }
 
     /**
-     * 设置可否多选
-     * @param bool $multiselect
-     * @return self
-     */
-    public function setMultiselect(bool $multiselect)
-    {
-        $this->multiselect = $multiselect;
-        $this->setValidator($this->getDefaultValidator());
-
-        return $this;
-    }
-
-    public function isMultiselect(): bool
-    {
-        return $this->multiselect;
-    }
-
-    /**
      * 获取提示
      * @return string
      */
@@ -62,16 +45,9 @@ class Choice extends Question
         return $this->prompt;
     }
 
-    /**
-     * 设置提示
-     * @param string $prompt
-     * @return self
-     */
-    public function setPrompt(string $prompt)
+    public function isMultiselect(): bool
     {
-        $this->prompt = $prompt;
-
-        return $this;
+        return $this->multiselect;
     }
 
     /**
@@ -88,15 +64,40 @@ class Choice extends Question
     }
 
     /**
+     * 设置可否多选
+     * @param bool $multiselect
+     * @return self
+     */
+    public function setMultiselect(bool $multiselect)
+    {
+        $this->multiselect = $multiselect;
+        $this->setValidator($this->getDefaultValidator());
+
+        return $this;
+    }
+
+    /**
+     * 设置提示
+     * @param string $prompt
+     * @return self
+     */
+    public function setPrompt(string $prompt)
+    {
+        $this->prompt = $prompt;
+
+        return $this;
+    }
+
+    /**
      * 获取默认的验证方法
      * @return callable
      */
     private function getDefaultValidator()
     {
-        $choices      = $this->choices;
+        $choices = $this->choices;
         $errorMessage = $this->errorMessage;
-        $multiselect  = $this->multiselect;
-        $isAssoc      = $this->isAssoc($choices);
+        $multiselect = $this->multiselect;
+        $isAssoc = $this->isAssoc($choices);
 
         return function ($selected) use ($choices, $errorMessage, $multiselect, $isAssoc) {
             // Collapse all spaces.
@@ -105,7 +106,7 @@ class Choice extends Question
             if ($multiselect) {
                 // Check for a separated comma values
                 if (!preg_match('/^[a-zA-Z0-9_-]+(?:,[a-zA-Z0-9_-]+)*$/', $selectedChoices, $matches)) {
-                    throw new \InvalidArgumentException(sprintf($errorMessage, $selected));
+                    throw new InvalidArgumentException(sprintf($errorMessage, $selected));
                 }
                 $selectedChoices = explode(',', $selectedChoices);
             } else {
@@ -122,7 +123,7 @@ class Choice extends Question
                 }
 
                 if (count($results) > 1) {
-                    throw new \InvalidArgumentException(sprintf('The provided answer is ambiguous. Value should be one of %s.', implode(' or ', $results)));
+                    throw new InvalidArgumentException(sprintf('The provided answer is ambiguous. Value should be one of %s.', implode(' or ', $results)));
                 }
 
                 $result = array_search($value, $choices);
@@ -138,7 +139,7 @@ class Choice extends Question
                 }
 
                 if (false === $result) {
-                    throw new \InvalidArgumentException(sprintf($errorMessage, $value));
+                    throw new InvalidArgumentException(sprintf($errorMessage, $value));
                 }
                 array_push($multiselectChoices, $result);
             }

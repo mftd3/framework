@@ -1,6 +1,6 @@
 <?php
 
-namespace think\exception;
+namespace mftd\exception;
 
 use Psr\Container\NotFoundExceptionInterface;
 use RuntimeException;
@@ -13,7 +13,7 @@ class ClassNotFoundException extends RuntimeException implements NotFoundExcepti
     public function __construct(string $message, string $class = '', Throwable $previous = null)
     {
         $this->message = $message;
-        $this->class   = $class;
+        $this->class = $class;
 
         parent::__construct($message, 0, $previous);
     }

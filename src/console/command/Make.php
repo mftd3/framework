@@ -1,17 +1,31 @@
 <?php
 
-namespace think\console\command;
+namespace mftd\console\command;
 
-use think\console\Command;
-use think\console\Input;
-use think\console\input\Argument;
-use think\console\Output;
+use mftd\console\Command;
+use mftd\console\Input;
+use mftd\console\input\Argument;
+use mftd\console\Output;
 
 abstract class Make extends Command
 {
     protected $type;
 
-    abstract protected function getStub();
+    protected function buildClass(string $name)
+    {
+        $stub = file_get_contents($this->getStub());
+
+        $namespace = trim(implode('\\', array_slice(explode('\\', $name), 0, -1)), '\\');
+
+        $class = str_replace($namespace . '\\', '', $name);
+
+        return str_replace(['{%className%}', '{%actionSuffix%}', '{%namespace%}', '{%app_namespace%}'], [
+            $class,
+            $this->app->config->get('route.action_suffix'),
+            $namespace,
+            $this->app->getNamespace(),
+        ], $stub);
+    }
 
     protected function configure()
     {
@@ -40,29 +54,6 @@ abstract class Make extends Command
         $output->writeln('<info>' . $this->type . ':' . $classname . ' created successfully.</info>');
     }
 
-    protected function buildClass(string $name)
-    {
-        $stub = file_get_contents($this->getStub());
-
-        $namespace = trim(implode('\\', array_slice(explode('\\', $name), 0, -1)), '\\');
-
-        $class = str_replace($namespace . '\\', '', $name);
-
-        return str_replace(['{%className%}', '{%actionSuffix%}', '{%namespace%}', '{%app_namespace%}'], [
-            $class,
-            $this->app->config->get('route.action_suffix'),
-            $namespace,
-            $this->app->getNamespace(),
-        ], $stub);
-    }
-
-    protected function getPathName(string $name): string
-    {
-        $name = substr($name, 4);
-
-        return $this->app->getBasePath() . ltrim(str_replace('\\', '/', $name), '/') . '.php';
-    }
-
     protected function getClassName(string $name): string
     {
         if (strpos($name, '\\') !== false) {
@@ -86,4 +77,13 @@ abstract class Make extends Command
     {
         return 'app' . ($app ? '\\' . $app : '');
     }
+
+    protected function getPathName(string $name): string
+    {
+        $name = substr($name, 4);
+
+        return $this->app->getBasePath() . ltrim(str_replace('\\', '/', $name), '/') . '.php';
+    }
+
+    abstract protected function getStub();
 }

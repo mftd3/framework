@@ -1,15 +1,15 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\exception;
+namespace mftd\exception;
 
-use think\Response;
+use mftd\Response;
+use RuntimeException;
 
 /**
  * HTTP响应异常
  */
-class HttpResponseException extends \RuntimeException
+class HttpResponseException extends RuntimeException
 {
     /**
      * @var Response

@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\middleware;
+namespace mftd\middleware;
 
 use Closure;
-use think\App;
-use think\Request;
-use think\Response;
-use think\Session;
+use mftd\App;
+use mftd\Request;
+use mftd\Response;
+use mftd\Session;
 
 /**
  * Session初始化
@@ -23,8 +22,13 @@ class SessionInit
 
     public function __construct(App $app, Session $session)
     {
-        $this->app     = $app;
+        $this->app = $app;
         $this->session = $session;
+    }
+
+    public function end(Response $response)
+    {
+        $this->session->save();
     }
 
     /**
@@ -38,7 +42,7 @@ class SessionInit
     {
         // Session初始化
         $varSessionId = $this->app->config->get('session.var_session_id');
-        $cookieName   = $this->session->getName();
+        $cookieName = $this->session->getName();
 
         if ($varSessionId && $request->request($varSessionId)) {
             $sessionId = $request->request($varSessionId);
@@ -62,10 +66,5 @@ class SessionInit
         $this->app->cookie->set($cookieName, $this->session->getId());
 
         return $response;
-    }
-
-    public function end(Response $response)
-    {
-        $this->session->save();
     }
 }

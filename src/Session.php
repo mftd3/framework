@@ -1,33 +1,25 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
-use think\helper\Arr;
-use think\session\Store;
+use mftd\helper\Arr;
+use mftd\session\Store;
 
 /**
  * Session管理类
- * @package think
+ * @package mftd
  * @mixin Store
  */
 class Session extends Manager
 {
-    protected $namespace = '\\think\\session\\driver\\';
-
-    protected function createDriver(string $name)
-    {
-        $handler = parent::createDriver($name);
-
-        return new Store($this->getConfig('name') ?: 'PHPSESSID', $handler, $this->getConfig('serialize'));
-    }
+    protected $namespace = '\\mftd\\session\\driver\\';
 
     /**
      * 获取Session配置
      * @access public
-     * @param null|string $name    名称
-     * @param mixed       $default 默认值
+     * @param null|string $name 名称
+     * @param mixed $default 默认值
      * @return mixed
      */
     public function getConfig(string $name = null, $default = null)
@@ -39,13 +31,6 @@ class Session extends Manager
         return $this->app->config->get('session');
     }
 
-    protected function resolveConfig(string $name)
-    {
-        $config = $this->app->config->get('session', []);
-        Arr::forget($config, 'type');
-        return $config;
-    }
-
     /**
      * 默认驱动
      * @return string|null
@@ -53,5 +38,19 @@ class Session extends Manager
     public function getDefaultDriver()
     {
         return $this->app->config->get('session.type', 'file');
+    }
+
+    protected function createDriver(string $name)
+    {
+        $handler = parent::createDriver($name);
+
+        return new Store($this->getConfig('name') ?: 'PHPSESSID', $handler, $this->getConfig('serialize'));
+    }
+
+    protected function resolveConfig(string $name)
+    {
+        $config = $this->app->config->get('session', []);
+        Arr::forget($config, 'type');
+        return $config;
     }
 }

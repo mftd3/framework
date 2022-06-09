@@ -1,12 +1,11 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\filesystem\driver;
+namespace mftd\filesystem\driver;
 
-use League\Flysystem\AdapterInterface;
 use League\Flysystem\Adapter\Local as LocalAdapter;
-use think\filesystem\Driver;
+use League\Flysystem\AdapterInterface;
+use mftd\filesystem\Driver;
 
 class Local extends Driver
 {
@@ -17,6 +16,21 @@ class Local extends Driver
     protected $config = [
         'root' => '',
     ];
+
+    /**
+     * 获取文件访问地址
+     * @param string $path 文件路径
+     * @return string
+     */
+    public function url(string $path): string
+    {
+        $path = str_replace('\\', '/', $path);
+
+        if (isset($this->config['url'])) {
+            return $this->concatPathToUrl($this->config['url'], $path);
+        }
+        return parent::url($path);
+    }
 
     protected function createAdapter(): AdapterInterface
     {
@@ -32,20 +46,5 @@ class Local extends Driver
             $links,
             $permissions
         );
-    }
-
-    /**
-     * 获取文件访问地址
-     * @param string $path 文件路径
-     * @return string
-     */
-    public function url(string $path): string
-    {
-        $path = str_replace('\\', '/', $path);
-
-        if (isset($this->config['url'])) {
-            return $this->concatPathToUrl($this->config['url'], $path);
-        }
-        return parent::url($path);
     }
 }

@@ -1,12 +1,13 @@
 <?php
 
-namespace think\facade;
+namespace mftd\facade;
 
-use think\Facade;
+use mftd\DbManager;
+use mftd\Facade;
 
 /**
- * @see \think\DbManager
- * @mixin \think\DbManager
+ * @see \mftd\DbManager
+ * @mixin DbManager
  */
 class Db extends Facade
 {
@@ -17,6 +18,6 @@ class Db extends Facade
      */
     protected static function getFacadeClass()
     {
-        return 'think\DbManager';
+        return 'mftd\DbManager';
     }
 }

@@ -1,42 +1,38 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\console;
+namespace mftd\console;
 
 use Exception;
 use InvalidArgumentException;
 use LogicException;
-use think\App;
-use think\Console;
-use think\console\input\Argument;
-use think\console\input\Definition;
-use think\console\input\Option;
+use mftd\App;
+use mftd\Console;
+use mftd\console\input\Argument;
+use mftd\console\input\Definition;
+use mftd\console\input\Option;
 
 abstract class Command
 {
-    /** @var  Console */
-    private $console;
-    private $name;
-    private $processTitle;
-    private $aliases = [];
-    private $definition;
-    private $help;
-    private $description;
-    private $ignoreValidationErrors          = false;
-    private $consoleDefinitionMerged         = false;
-    private $consoleDefinitionMergedWithArgs = false;
-    private $synopsis                        = [];
-    private $usages                          = [];
-
-    /** @var  Input */
-    protected $input;
-
-    /** @var  Output */
-    protected $output;
-
     /** @var App */
     protected $app;
+    /** @var  Input */
+    protected $input;
+    /** @var  Output */
+    protected $output;
+    private $aliases = [];
+    /** @var  Console */
+    private $console;
+    private $consoleDefinitionMerged = false;
+    private $consoleDefinitionMergedWithArgs = false;
+    private $definition;
+    private $description;
+    private $help;
+    private $ignoreValidationErrors = false;
+    private $name;
+    private $processTitle;
+    private $synopsis = [];
+    private $usages = [];
 
     /**
      * 构造方法
@@ -55,20 +51,68 @@ abstract class Command
     }
 
     /**
-     * 忽略验证错误
+     * 添加参数
+     * @param string $name 名称
+     * @param int $mode 类型
+     * @param string $description 描述
+     * @param mixed $default 默认值
+     * @return Command
      */
-    public function ignoreValidationErrors(): void
+    public function addArgument(string $name, int $mode = null, string $description = '', $default = null)
     {
-        $this->ignoreValidationErrors = true;
+        $this->definition->addArgument(new Argument($name, $mode, $description, $default));
+
+        return $this;
     }
 
     /**
-     * 设置控制台
-     * @param Console $console
+     * 添加选项
+     * @param string $name 选项名称
+     * @param string $shortcut 别名
+     * @param int $mode 类型
+     * @param string $description 描述
+     * @param mixed $default 默认值
+     * @return Command
      */
-    public function setConsole(Console $console = null): void
+    public function addOption(string $name, string $shortcut = null, int $mode = null, string $description = '', $default = null)
     {
-        $this->console = $console;
+        $this->definition->addOption(new Option($name, $shortcut, $mode, $description, $default));
+
+        return $this;
+    }
+
+    /**
+     * 添加用法介绍
+     * @param string $usage
+     * @return $this
+     */
+    public function addUsage(string $usage)
+    {
+        if (0 !== strpos($usage, $this->name)) {
+            $usage = sprintf('%s %s', $this->name, $usage);
+        }
+
+        $this->usages[] = $usage;
+
+        return $this;
+    }
+
+    /**
+     * 获取别名
+     * @return array
+     */
+    public function getAliases(): array
+    {
+        return $this->aliases;
+    }
+
+    /**
+     * 获取app
+     * @return App
+     */
+    public function getApp()
+    {
+        return $this->app;
     }
 
     /**
@@ -82,21 +126,102 @@ abstract class Command
     }
 
     /**
-     * 设置app
-     * @param App $app
+     * 获取参数定义
+     * @return Definition
+     * @api
      */
-    public function setApp(App $app)
+    public function getDefinition(): Definition
     {
-        $this->app = $app;
+        return $this->definition;
     }
 
     /**
-     * 获取app
-     * @return App
+     *  获取描述
+     * @return string
      */
-    public function getApp()
+    public function getDescription(): string
     {
-        return $this->app;
+        return $this->description ?: '';
+    }
+
+    /**
+     * 获取帮助信息
+     * @return string
+     */
+    public function getHelp(): string
+    {
+        return $this->help ?: '';
+    }
+
+    /**
+     * 获取指令名称
+     * @return string
+     */
+    public function getName(): string
+    {
+        return $this->name ?: '';
+    }
+
+    /**
+     * 获取当前指令的参数定义
+     * @return Definition
+     */
+    public function getNativeDefinition(): Definition
+    {
+        return $this->getDefinition();
+    }
+
+    /**
+     * 描述信息
+     * @return string
+     */
+    public function getProcessedHelp(): string
+    {
+        $name = $this->name;
+
+        $placeholders = [
+            '%command.name%',
+            '%command.full_name%',
+        ];
+        $replacements = [
+            $name,
+            $_SERVER['PHP_SELF'] . ' ' . $name,
+        ];
+
+        return str_replace($placeholders, $replacements, $this->getHelp());
+    }
+
+    /**
+     * 获取简介
+     * @param bool $short 是否简单的
+     * @return string
+     */
+    public function getSynopsis(bool $short = false): string
+    {
+        $key = $short ? 'short' : 'long';
+
+        if (!isset($this->synopsis[$key])) {
+            $this->synopsis[$key] = trim(sprintf('%s %s', $this->name, $this->definition->getSynopsis($short)));
+        }
+
+        return $this->synopsis[$key];
+    }
+
+    /**
+     * 获取用法介绍
+     * @return array
+     */
+    public function getUsages(): array
+    {
+        return $this->usages;
+    }
+
+    /**
+     * 忽略验证错误
+     */
+    public function ignoreValidationErrors(): void
+    {
+        $this->ignoreValidationErrors = true;
     }
 
     /**
@@ -109,46 +234,36 @@ abstract class Command
     }
 
     /**
-     * 配置指令
+     * 合并参数定义
+     * @param bool $mergeArgs
      */
-    protected function configure()
+    public function mergeConsoleDefinition(bool $mergeArgs = true)
     {
-    }
+        if (
+            null === $this->console
+            || (true === $this->consoleDefinitionMerged
+                && ($this->consoleDefinitionMergedWithArgs || !$mergeArgs))
+        ) {
+            return;
+        }
 
-    /**
-     * 执行指令
-     * @param Input  $input
-     * @param Output $output
-     * @return null|int
-     * @throws LogicException
-     * @see setCode()
-     */
-    protected function execute(Input $input, Output $output)
-    {
-        return $this->app->invoke([$this, 'handle']);
-    }
+        if ($mergeArgs) {
+            $currentArguments = $this->definition->getArguments();
+            $this->definition->setArguments($this->console->getDefinition()->getArguments());
+            $this->definition->addArguments($currentArguments);
+        }
 
-    /**
-     * 用户验证
-     * @param Input  $input
-     * @param Output $output
-     */
-    protected function interact(Input $input, Output $output)
-    {
-    }
+        $this->definition->addOptions($this->console->getDefinition()->getOptions());
 
-    /**
-     * 初始化
-     * @param Input  $input  An InputInterface instance
-     * @param Output $output An OutputInterface instance
-     */
-    protected function initialize(Input $input, Output $output)
-    {
+        $this->consoleDefinitionMerged = true;
+        if ($mergeArgs) {
+            $this->consoleDefinitionMergedWithArgs = true;
+        }
     }
 
     /**
      * 执行
-     * @param Input  $input
+     * @param Input $input
      * @param Output $output
      * @return int
      * @throws Exception
@@ -157,7 +272,7 @@ abstract class Command
      */
     public function run(Input $input, Output $output): int
     {
-        $this->input  = $input;
+        $this->input = $input;
         $this->output = $output;
 
         $this->getSynopsis(true);
@@ -200,35 +315,42 @@ abstract class Command
 
         $statusCode = $this->execute($input, $output);
 
-        return is_numeric($statusCode) ? (int) $statusCode : 0;
+        return is_numeric($statusCode) ? (int)$statusCode : 0;
     }
 
     /**
-     * 合并参数定义
-     * @param bool $mergeArgs
+     * 设置别名
+     * @param string[] $aliases
+     * @return Command
+     * @throws InvalidArgumentException
      */
-    public function mergeConsoleDefinition(bool $mergeArgs = true)
+    public function setAliases(iterable $aliases)
     {
-        if (
-            null === $this->console
-            || (true === $this->consoleDefinitionMerged
-                && ($this->consoleDefinitionMergedWithArgs || !$mergeArgs))
-        ) {
-            return;
+        foreach ($aliases as $alias) {
+            $this->validateName($alias);
         }
 
-        if ($mergeArgs) {
-            $currentArguments = $this->definition->getArguments();
-            $this->definition->setArguments($this->console->getDefinition()->getArguments());
-            $this->definition->addArguments($currentArguments);
-        }
+        $this->aliases = $aliases;
 
-        $this->definition->addOptions($this->console->getDefinition()->getOptions());
+        return $this;
+    }
 
-        $this->consoleDefinitionMerged = true;
-        if ($mergeArgs) {
-            $this->consoleDefinitionMergedWithArgs = true;
-        }
+    /**
+     * 设置app
+     * @param App $app
+     */
+    public function setApp(App $app)
+    {
+        $this->app = $app;
+    }
+
+    /**
+     * 设置控制台
+     * @param Console $console
+     */
+    public function setConsole(Console $console = null): void
+    {
+        $this->console = $console;
     }
 
     /**
@@ -251,51 +373,25 @@ abstract class Command
     }
 
     /**
-     * 获取参数定义
-     * @return Definition
-     * @api
-     */
-    public function getDefinition(): Definition
-    {
-        return $this->definition;
-    }
-
-    /**
-     * 获取当前指令的参数定义
-     * @return Definition
-     */
-    public function getNativeDefinition(): Definition
-    {
-        return $this->getDefinition();
-    }
-
-    /**
-     * 添加参数
-     * @param string $name        名称
-     * @param int    $mode        类型
-     * @param string $description 描述
-     * @param mixed  $default     默认值
+     * 设置描述
+     * @param string $description
      * @return Command
      */
-    public function addArgument(string $name, int $mode = null, string $description = '', $default = null)
+    public function setDescription(string $description)
     {
-        $this->definition->addArgument(new Argument($name, $mode, $description, $default));
+        $this->description = $description;
 
         return $this;
     }
 
     /**
-     * 添加选项
-     * @param string $name        选项名称
-     * @param string $shortcut    别名
-     * @param int    $mode        类型
-     * @param string $description 描述
-     * @param mixed  $default     默认值
+     * 设置帮助信息
+     * @param string $help
      * @return Command
      */
-    public function addOption(string $name, string $shortcut = null, int $mode = null, string $description = '', $default = null)
+    public function setHelp(string $help)
     {
-        $this->definition->addOption(new Option($name, $shortcut, $mode, $description, $default));
+        $this->help = $help;
 
         return $this;
     }
@@ -332,153 +428,41 @@ abstract class Command
     }
 
     /**
-     * 获取指令名称
-     * @return string
+     * 配置指令
      */
-    public function getName(): string
+    protected function configure()
     {
-        return $this->name ?: '';
     }
 
     /**
-     * 设置描述
-     * @param string $description
-     * @return Command
+     * 执行指令
+     * @param Input $input
+     * @param Output $output
+     * @return null|int
+     * @throws LogicException
+     * @see setCode()
      */
-    public function setDescription(string $description)
+    protected function execute(Input $input, Output $output)
     {
-        $this->description = $description;
-
-        return $this;
+        return $this->app->invoke([$this, 'handle']);
     }
 
     /**
-     *  获取描述
-     * @return string
+     * 初始化
+     * @param Input $input An InputInterface instance
+     * @param Output $output An OutputInterface instance
      */
-    public function getDescription(): string
+    protected function initialize(Input $input, Output $output)
     {
-        return $this->description ?: '';
     }
 
     /**
-     * 设置帮助信息
-     * @param string $help
-     * @return Command
+     * 用户验证
+     * @param Input $input
+     * @param Output $output
      */
-    public function setHelp(string $help)
+    protected function interact(Input $input, Output $output)
     {
-        $this->help = $help;
-
-        return $this;
-    }
-
-    /**
-     * 获取帮助信息
-     * @return string
-     */
-    public function getHelp(): string
-    {
-        return $this->help ?: '';
-    }
-
-    /**
-     * 描述信息
-     * @return string
-     */
-    public function getProcessedHelp(): string
-    {
-        $name = $this->name;
-
-        $placeholders = [
-            '%command.name%',
-            '%command.full_name%',
-        ];
-        $replacements = [
-            $name,
-            $_SERVER['PHP_SELF'] . ' ' . $name,
-        ];
-
-        return str_replace($placeholders, $replacements, $this->getHelp());
-    }
-
-    /**
-     * 设置别名
-     * @param string[] $aliases
-     * @return Command
-     * @throws InvalidArgumentException
-     */
-    public function setAliases(iterable $aliases)
-    {
-        foreach ($aliases as $alias) {
-            $this->validateName($alias);
-        }
-
-        $this->aliases = $aliases;
-
-        return $this;
-    }
-
-    /**
-     * 获取别名
-     * @return array
-     */
-    public function getAliases(): array
-    {
-        return $this->aliases;
-    }
-
-    /**
-     * 获取简介
-     * @param bool $short 是否简单的
-     * @return string
-     */
-    public function getSynopsis(bool $short = false): string
-    {
-        $key = $short ? 'short' : 'long';
-
-        if (!isset($this->synopsis[$key])) {
-            $this->synopsis[$key] = trim(sprintf('%s %s', $this->name, $this->definition->getSynopsis($short)));
-        }
-
-        return $this->synopsis[$key];
-    }
-
-    /**
-     * 添加用法介绍
-     * @param string $usage
-     * @return $this
-     */
-    public function addUsage(string $usage)
-    {
-        if (0 !== strpos($usage, $this->name)) {
-            $usage = sprintf('%s %s', $this->name, $usage);
-        }
-
-        $this->usages[] = $usage;
-
-        return $this;
-    }
-
-    /**
-     * 获取用法介绍
-     * @return array
-     */
-    public function getUsages(): array
-    {
-        return $this->usages;
-    }
-
-    /**
-     * 验证指令名称
-     * @param string $name
-     * @throws InvalidArgumentException
-     */
-    private function validateName(string $name)
-    {
-        if (!preg_match('/^[^\:]++(\:[^\:]++)*$/', $name)) {
-            throw new InvalidArgumentException(sprintf('Command name "%s" is invalid.', $name));
-        }
     }
 
     /**
@@ -491,5 +475,17 @@ abstract class Command
         $content = $table->render();
         $this->output->writeln($content);
         return $content;
+    }
+
+    /**
+     * 验证指令名称
+     * @param string $name
+     * @throws InvalidArgumentException
+     */
+    private function validateName(string $name)
+    {
+        if (!preg_match('/^[^\:]++(\:[^\:]++)*$/', $name)) {
+            throw new InvalidArgumentException(sprintf('Command name "%s" is invalid.', $name));
+        }
     }
 }

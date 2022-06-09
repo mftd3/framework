@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\middleware;
+namespace mftd\middleware;
 
 use Closure;
-use think\Cache;
-use think\Config;
-use think\Request;
-use think\Response;
+use mftd\Cache;
+use mftd\Config;
+use mftd\Request;
+use mftd\Response;
 
 /**
  * 请求缓存处理
@@ -27,18 +26,18 @@ class CheckRequestCache
      */
     protected $config = [
         // 请求缓存规则 true为自动规则
-        'request_cache_key'    => true,
+        'request_cache_key' => true,
         // 请求缓存有效期
         'request_cache_expire' => null,
         // 全局请求缓存排除规则
         'request_cache_except' => [],
         // 请求缓存的Tag
-        'request_cache_tag'    => '',
+        'request_cache_tag' => '',
     ];
 
     public function __construct(Cache $cache, Config $config)
     {
-        $this->cache  = $cache;
+        $this->cache = $cache;
         $this->config = array_merge($this->config, $config->get('route'));
     }
 
@@ -47,7 +46,7 @@ class CheckRequestCache
      * @access public
      * @param Request $request
      * @param Closure $next
-     * @param mixed   $cache
+     * @param mixed $cache
      * @return Response
      */
     public function handle($request, Closure $next, $cache = null)
@@ -64,9 +63,9 @@ class CheckRequestCache
                 if (is_array($cache)) {
                     [$key, $expire, $tag] = array_pad($cache, 3, null);
                 } else {
-                    $key    = md5($request->url(true));
+                    $key = md5($request->url(true));
                     $expire = $cache;
-                    $tag    = null;
+                    $tag = null;
                 }
 
                 $key = $this->parseCacheKey($request, $key);
@@ -86,10 +85,10 @@ class CheckRequestCache
         $response = $next($request);
 
         if (isset($key) && 200 == $response->getCode() && $response->isAllowCache()) {
-            $header                  = $response->getHeader();
+            $header = $response->getHeader();
             $header['Cache-Control'] = 'max-age=' . $expire . ',must-revalidate';
             $header['Last-Modified'] = gmdate('D, d M Y H:i:s') . ' GMT';
-            $header['Expires']       = gmdate('D, d M Y H:i:s', time() + $expire) . ' GMT';
+            $header['Expires'] = gmdate('D, d M Y H:i:s', time() + $expire) . ' GMT';
 
             $this->cache->tag($tag)->set($key, [$response->getContent(), $header, time()], $expire);
         }
@@ -105,10 +104,10 @@ class CheckRequestCache
      */
     protected function getRequestCache($request)
     {
-        $key    = $this->config['request_cache_key'];
+        $key = $this->config['request_cache_key'];
         $expire = $this->config['request_cache_expire'];
         $except = $this->config['request_cache_except'];
-        $tag    = $this->config['request_cache_tag'];
+        $tag = $this->config['request_cache_tag'];
 
         foreach ($except as $rule) {
             if (0 === stripos($request->url(), $rule)) {
@@ -123,12 +122,12 @@ class CheckRequestCache
      * 读取当前地址的请求缓存信息
      * @access protected
      * @param Request $request
-     * @param mixed   $key
+     * @param mixed $key
      * @return null|string
      */
     protected function parseCacheKey($request, $key)
     {
-        if ($key instanceof \Closure) {
+        if ($key instanceof Closure) {
             $key = call_user_func($key, $request);
         }
 
@@ -154,7 +153,7 @@ class CheckRequestCache
 
             foreach ($param as $item => $val) {
                 if (is_string($val) && false !== strpos($key, ':' . $item)) {
-                    $key = str_replace(':' . $item, (string) $val, $key);
+                    $key = str_replace(':' . $item, (string)$val, $key);
                 }
             }
         } elseif (strpos($key, ']')) {

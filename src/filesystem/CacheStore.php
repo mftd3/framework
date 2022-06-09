@@ -1,35 +1,22 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\filesystem;
+namespace mftd\filesystem;
 
 use League\Flysystem\Cached\Storage\AbstractCache;
 use Psr\SimpleCache\CacheInterface;
 
 class CacheStore extends AbstractCache
 {
-    protected $store;
-
-    protected $key;
-
     protected $expire;
+    protected $key;
+    protected $store;
 
     public function __construct(CacheInterface $store, $key = 'flysystem', $expire = null)
     {
-        $this->key    = $key;
-        $this->store  = $store;
+        $this->key = $key;
+        $this->store = $store;
         $this->expire = $expire;
-    }
-
-    /**
-     * Store the cache.
-     */
-    public function save()
-    {
-        $contents = $this->getForStorage();
-
-        $this->store->set($this->key, $contents, $this->expire);
     }
 
     /**
@@ -42,5 +29,15 @@ class CacheStore extends AbstractCache
         if (!is_null($contents)) {
             $this->setFromStorage($contents);
         }
+    }
+
+    /**
+     * Store the cache.
+     */
+    public function save()
+    {
+        $contents = $this->getForStorage();
+
+        $this->store->set($this->key, $contents, $this->expire);
     }
 }

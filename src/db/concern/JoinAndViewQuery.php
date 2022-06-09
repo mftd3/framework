@@ -1,11 +1,9 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\db\concern;
+namespace mftd\db\concern;
 
-use think\db\Raw;
-use think\helper\Str;
+use mftd\db\Raw;
 
 /**
  * JOIN和VIEW查询
@@ -13,12 +11,25 @@ use think\helper\Str;
 trait JoinAndViewQuery
 {
     /**
+     * FULL JOIN
+     * @access public
+     * @param mixed $join 关联的表名
+     * @param mixed $condition 条件
+     * @param array $bind 参数绑定
+     * @return $this
+     */
+    public function fullJoin($join, string $condition = null, array $bind = [])
+    {
+        return $this->join($join, $condition, 'FULL');
+    }
+
+    /**
      * 查询SQL组装 join
      * @access public
-     * @param mixed  $join      关联的表名
-     * @param mixed  $condition 条件
-     * @param string $type      JOIN类型
-     * @param array  $bind      参数绑定
+     * @param mixed $join 关联的表名
+     * @param mixed $condition 条件
+     * @param string $type JOIN类型
+     * @param array $bind 参数绑定
      * @return $this
      */
     public function join($join, string $condition = null, string $type = 'INNER', array $bind = [])
@@ -37,9 +48,9 @@ trait JoinAndViewQuery
     /**
      * LEFT JOIN
      * @access public
-     * @param mixed $join      关联的表名
+     * @param mixed $join 关联的表名
      * @param mixed $condition 条件
-     * @param array $bind      参数绑定
+     * @param array $bind 参数绑定
      * @return $this
      */
     public function leftJoin($join, string $condition = null, array $bind = [])
@@ -50,9 +61,9 @@ trait JoinAndViewQuery
     /**
      * RIGHT JOIN
      * @access public
-     * @param mixed $join      关联的表名
+     * @param mixed $join 关联的表名
      * @param mixed $condition 条件
-     * @param array $bind      参数绑定
+     * @param array $bind 参数绑定
      * @return $this
      */
     public function rightJoin($join, string $condition = null, array $bind = [])
@@ -61,24 +72,65 @@ trait JoinAndViewQuery
     }
 
     /**
-     * FULL JOIN
+     * 指定JOIN查询字段
      * @access public
-     * @param mixed $join      关联的表名
-     * @param mixed $condition 条件
-     * @param array $bind      参数绑定
+     * @param string|array $join 数据表
+     * @param string|array $field 查询字段
+     * @param string $on JOIN条件
+     * @param string $type JOIN类型
+     * @param array $bind 参数绑定
      * @return $this
      */
-    public function fullJoin($join, string $condition = null, array $bind = [])
+    public function view($join, $field = true, $on = null, string $type = 'INNER', array $bind = [])
     {
-        return $this->join($join, $condition, 'FULL');
+        $this->options['view'] = true;
+
+        $fields = [];
+        $table = $this->getJoinTable($join, $alias);
+
+        if (true === $field) {
+            $fields = $alias . '.*';
+        } else {
+            if (is_string($field)) {
+                $field = explode(',', $field);
+            }
+
+            foreach ($field as $key => $val) {
+                if (is_numeric($key)) {
+                    $fields[] = $alias . '.' . $val;
+
+                    $this->options['map'][$val] = $alias . '.' . $val;
+                } else {
+                    if (preg_match('/[,=\.\'\"\(\s]/', $key)) {
+                        $name = $key;
+                    } else {
+                        $name = $alias . '.' . $key;
+                    }
+
+                    $fields[] = $name . ' AS ' . $val;
+
+                    $this->options['map'][$val] = $name;
+                }
+            }
+        }
+
+        $this->field($fields);
+
+        if ($on) {
+            $this->join($table, $on, $type, $bind);
+        } else {
+            $this->table($table);
+        }
+
+        return $this;
     }
 
     /**
      * 获取Join表名及别名 支持
      * ['prefix_table或者子查询'=>'alias'] 'table alias'
      * @access protected
-     * @param array|string|Raw $join  JION表名
-     * @param string           $alias 别名
+     * @param array|string|Raw $join JION表名
+     * @param string $alias 别名
      * @return string|array
      */
     protected function getJoinTable($join, &$alias = null)
@@ -118,60 +170,6 @@ trait JoinAndViewQuery
         }
 
         return $table;
-    }
-
-    /**
-     * 指定JOIN查询字段
-     * @access public
-     * @param string|array $join  数据表
-     * @param string|array $field 查询字段
-     * @param string       $on    JOIN条件
-     * @param string       $type  JOIN类型
-     * @param array        $bind  参数绑定
-     * @return $this
-     */
-    public function view($join, $field = true, $on = null, string $type = 'INNER', array $bind = [])
-    {
-        $this->options['view'] = true;
-
-        $fields = [];
-        $table  = $this->getJoinTable($join, $alias);
-
-        if (true === $field) {
-            $fields = $alias . '.*';
-        } else {
-            if (is_string($field)) {
-                $field = explode(',', $field);
-            }
-
-            foreach ($field as $key => $val) {
-                if (is_numeric($key)) {
-                    $fields[] = $alias . '.' . $val;
-
-                    $this->options['map'][$val] = $alias . '.' . $val;
-                } else {
-                    if (preg_match('/[,=\.\'\"\(\s]/', $key)) {
-                        $name = $key;
-                    } else {
-                        $name = $alias . '.' . $key;
-                    }
-
-                    $fields[] = $name . ' AS ' . $val;
-
-                    $this->options['map'][$val] = $name;
-                }
-            }
-        }
-
-        $this->field($fields);
-
-        if ($on) {
-            $this->join($table, $on, $type, $bind);
-        } else {
-            $this->table($table);
-        }
-
-        return $this;
     }
 
     /**

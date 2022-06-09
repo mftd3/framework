@@ -1,16 +1,15 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\middleware;
+namespace mftd\middleware;
 
 use Closure;
-use think\App;
-use think\Config;
-use think\Cookie;
-use think\Lang;
-use think\Request;
-use think\Response;
+use mftd\App;
+use mftd\Config;
+use mftd\Cookie;
+use mftd\Lang;
+use mftd\Request;
+use mftd\Response;
 
 /**
  * 多语言加载
@@ -18,13 +17,13 @@ use think\Response;
 class LoadLangPack
 {
     protected $app;
-    protected $lang;
     protected $config;
+    protected $lang;
 
     public function __construct(App $app, Lang $lang, Config $config)
     {
-        $this->app    = $app;
-        $this->lang   = $lang;
+        $this->app = $app;
+        $this->lang = $lang;
         $this->config = $lang->getConfig();
     }
 

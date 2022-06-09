@@ -1,10 +1,10 @@
 <?php
 
-namespace think\helper;
+namespace mftd\helper;
 
 use ArrayAccess;
 use InvalidArgumentException;
-use think\Collection;
+use mftd\Collection;
 
 class Arr
 {
@@ -22,9 +22,9 @@ class Arr
     /**
      * Add an element to an array using "dot" notation if it doesn't exist.
      *
-     * @param array  $array
+     * @param array $array
      * @param string $key
-     * @param mixed  $value
+     * @param mixed $value
      * @return array
      */
     public static function add($array, $key, $value)
@@ -100,7 +100,7 @@ class Arr
     /**
      * Flatten a multi-dimensional associative array with dots.
      *
-     * @param array  $array
+     * @param array $array
      * @param string $prepend
      * @return array
      */
@@ -122,7 +122,7 @@ class Arr
     /**
      * Get all of the given array except for a specified array of keys.
      *
-     * @param array        $array
+     * @param array $array
      * @param array|string $keys
      * @return array
      */
@@ -136,8 +136,8 @@ class Arr
     /**
      * Determine if the given key exists in the provided array.
      *
-     * @param \ArrayAccess|array $array
-     * @param string|int         $key
+     * @param ArrayAccess|array $array
+     * @param string|int $key
      * @return bool
      */
     public static function exists($array, $key)
@@ -152,9 +152,9 @@ class Arr
     /**
      * Return the first element in an array passing a given truth test.
      *
-     * @param array         $array
+     * @param array $array
      * @param callable|null $callback
-     * @param mixed         $default
+     * @param mixed $default
      * @return mixed
      */
     public static function first($array, callable $callback = null, $default = null)
@@ -179,27 +179,10 @@ class Arr
     }
 
     /**
-     * Return the last element in an array passing a given truth test.
-     *
-     * @param array         $array
-     * @param callable|null $callback
-     * @param mixed         $default
-     * @return mixed
-     */
-    public static function last($array, callable $callback = null, $default = null)
-    {
-        if (is_null($callback)) {
-            return empty($array) ? value($default) : end($array);
-        }
-
-        return static::first(array_reverse($array, true), $callback, $default);
-    }
-
-    /**
      * Flatten a multi-dimensional array into a single level.
      *
      * @param array $array
-     * @param int   $depth
+     * @param int $depth
      * @return array
      */
     public static function flatten($array, $depth = INF)
@@ -224,7 +207,7 @@ class Arr
     /**
      * Remove one or many array items from a given array using "dot" notation.
      *
-     * @param array        $array
+     * @param array $array
      * @param array|string $keys
      * @return void
      */
@@ -232,7 +215,7 @@ class Arr
     {
         $original = &$array;
 
-        $keys = (array) $keys;
+        $keys = (array)$keys;
 
         if (count($keys) === 0) {
             return;
@@ -268,9 +251,9 @@ class Arr
     /**
      * Get an item from an array using "dot" notation.
      *
-     * @param \ArrayAccess|array $array
-     * @param string             $key
-     * @param mixed              $default
+     * @param ArrayAccess|array $array
+     * @param string $key
+     * @param mixed $default
      * @return mixed
      */
     public static function get($array, $key, $default = null)
@@ -305,13 +288,13 @@ class Arr
     /**
      * Check if an item or items exist in an array using "dot" notation.
      *
-     * @param \ArrayAccess|array $array
-     * @param string|array       $keys
+     * @param ArrayAccess|array $array
+     * @param string|array $keys
      * @return bool
      */
     public static function has($array, $keys)
     {
-        $keys = (array) $keys;
+        $keys = (array)$keys;
 
         if (!$array || $keys === []) {
             return false;
@@ -352,22 +335,39 @@ class Arr
     }
 
     /**
+     * Return the last element in an array passing a given truth test.
+     *
+     * @param array $array
+     * @param callable|null $callback
+     * @param mixed $default
+     * @return mixed
+     */
+    public static function last($array, callable $callback = null, $default = null)
+    {
+        if (is_null($callback)) {
+            return empty($array) ? value($default) : end($array);
+        }
+
+        return static::first(array_reverse($array, true), $callback, $default);
+    }
+
+    /**
      * Get a subset of the items from the given array.
      *
-     * @param array        $array
+     * @param array $array
      * @param array|string $keys
      * @return array
      */
     public static function only($array, $keys)
     {
-        return array_intersect_key($array, array_flip((array) $keys));
+        return array_intersect_key($array, array_flip((array)$keys));
     }
 
     /**
      * Pluck an array of values from an array.
      *
-     * @param array             $array
-     * @param string|array      $value
+     * @param array $array
+     * @param string|array $value
      * @param string|array|null $key
      * @return array
      */
@@ -389,7 +389,7 @@ class Arr
                 $itemKey = data_get($item, $key);
 
                 if (is_object($itemKey) && method_exists($itemKey, '__toString')) {
-                    $itemKey = (string) $itemKey;
+                    $itemKey = (string)$itemKey;
                 }
 
                 $results[$itemKey] = $itemValue;
@@ -397,22 +397,6 @@ class Arr
         }
 
         return $results;
-    }
-
-    /**
-     * Explode the "value" and "key" arguments passed to "pluck".
-     *
-     * @param string|array      $value
-     * @param string|array|null $key
-     * @return array
-     */
-    protected static function explodePluckParameters($value, $key)
-    {
-        $value = is_string($value) ? explode('.', $value) : $value;
-
-        $key = is_null($key) || is_array($key) ? $key : explode('.', $key);
-
-        return [$value, $key];
     }
 
     /**
@@ -437,9 +421,9 @@ class Arr
     /**
      * Get a value from the array, and remove it.
      *
-     * @param array  $array
+     * @param array $array
      * @param string $key
-     * @param mixed  $default
+     * @param mixed $default
      * @return mixed
      */
     public static function pull(&$array, $key, $default = null)
@@ -452,13 +436,24 @@ class Arr
     }
 
     /**
+     * Convert the array into a query string.
+     *
+     * @param array $array
+     * @return string
+     */
+    public static function query($array)
+    {
+        return http_build_query($array, null, '&', PHP_QUERY_RFC3986);
+    }
+
+    /**
      * Get one or a specified number of random values from an array.
      *
-     * @param array    $array
+     * @param array $array
      * @param int|null $number
      * @return mixed
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     public static function random($array, $number = null)
     {
@@ -476,7 +471,7 @@ class Arr
             return $array[array_rand($array)];
         }
 
-        if ((int) $number === 0) {
+        if ((int)$number === 0) {
             return [];
         }
 
@@ -484,7 +479,7 @@ class Arr
 
         $results = [];
 
-        foreach ((array) $keys as $key) {
+        foreach ((array)$keys as $key) {
             $results[] = $array[$key];
         }
 
@@ -496,9 +491,9 @@ class Arr
      *
      * If no key is given to the method, the entire array will be replaced.
      *
-     * @param array  $array
+     * @param array $array
      * @param string $key
-     * @param mixed  $value
+     * @param mixed $value
      * @return array
      */
     public static function set(&$array, $key, $value)
@@ -530,7 +525,7 @@ class Arr
     /**
      * Shuffle the given array and return the result.
      *
-     * @param array    $array
+     * @param array $array
      * @param int|null $seed
      * @return array
      */
@@ -552,7 +547,7 @@ class Arr
     /**
      * Sort the array using the given callback or "dot" notation.
      *
-     * @param array                $array
+     * @param array $array
      * @param callable|string|null $callback
      * @return array
      */
@@ -585,20 +580,9 @@ class Arr
     }
 
     /**
-     * Convert the array into a query string.
-     *
-     * @param array $array
-     * @return string
-     */
-    public static function query($array)
-    {
-        return http_build_query($array, null, '&', PHP_QUERY_RFC3986);
-    }
-
-    /**
      * Filter the array using the given callback.
      *
-     * @param array    $array
+     * @param array $array
      * @param callable $callback
      * @return array
      */
@@ -620,5 +604,21 @@ class Arr
         }
 
         return is_array($value) ? $value : [$value];
+    }
+
+    /**
+     * Explode the "value" and "key" arguments passed to "pluck".
+     *
+     * @param string|array $value
+     * @param string|array|null $key
+     * @return array
+     */
+    protected static function explodePluckParameters($value, $key)
+    {
+        $value = is_string($value) ? explode('.', $value) : $value;
+
+        $key = is_null($key) || is_array($key) ? $key : explode('.', $key);
+
+        return [$value, $key];
     }
 }

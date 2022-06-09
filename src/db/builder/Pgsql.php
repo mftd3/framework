@@ -1,12 +1,11 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\db\builder;
+namespace mftd\db\builder;
 
-use think\db\Builder;
-use think\db\Query;
-use think\db\Raw;
+use mftd\db\Builder;
+use mftd\db\Query;
+use mftd\db\Raw;
 
 /**
  * Pgsql数据库驱动
@@ -14,52 +13,28 @@ use think\db\Raw;
 class Pgsql extends Builder
 {
     /**
+     * INSERT ALL SQL表达式
+     * @var string
+     */
+    protected $insertAllSql = 'INSERT INTO %TABLE% (%FIELD%) %DATA% %COMMENT%';
+    /**
      * INSERT SQL表达式
      * @var string
      */
     protected $insertSql = 'INSERT INTO %TABLE% (%FIELD%) VALUES (%DATA%) %COMMENT%';
 
     /**
-     * INSERT ALL SQL表达式
-     * @var string
-     */
-    protected $insertAllSql = 'INSERT INTO %TABLE% (%FIELD%) %DATA% %COMMENT%';
-
-    /**
-     * limit分析
-     * @access protected
-     * @param  Query     $query        查询对象
-     * @param  mixed     $limit
-     * @return string
-     */
-    public function parseLimit(Query $query, string $limit): string
-    {
-        $limitStr = '';
-
-        if (!empty($limit)) {
-            $limit = explode(',', $limit);
-            if (count($limit) > 1) {
-                $limitStr .= ' LIMIT ' . $limit[1] . ' OFFSET ' . $limit[0] . ' ';
-            } else {
-                $limitStr .= ' LIMIT ' . $limit[0] . ' ';
-            }
-        }
-
-        return $limitStr;
-    }
-
-    /**
      * 字段和表名处理
      * @access public
-     * @param  Query     $query     查询对象
-     * @param  mixed     $key       字段名
-     * @param  bool      $strict   严格检测
+     * @param Query $query 查询对象
+     * @param mixed $key 字段名
+     * @param bool $strict 严格检测
      * @return string
      */
     public function parseKey(Query $query, $key, bool $strict = false): string
     {
         if (is_int($key)) {
-            return (string) $key;
+            return (string)$key;
         } elseif ($key instanceof Raw) {
             return $this->parseRaw($query, $key);
         }
@@ -69,7 +44,7 @@ class Pgsql extends Builder
         if (strpos($key, '->') && false === strpos($key, '(')) {
             // JSON字段支持
             [$field, $name] = explode('->', $key);
-            $key            = '"' . $field . '"' . '->>\'' . $name . '\'';
+            $key = '"' . $field . '"' . '->>\'' . $name . '\'';
         } elseif (strpos($key, '.')) {
             [$table, $key] = explode('.', $key, 2);
 
@@ -97,9 +72,32 @@ class Pgsql extends Builder
     }
 
     /**
+     * limit分析
+     * @access protected
+     * @param Query $query 查询对象
+     * @param mixed $limit
+     * @return string
+     */
+    public function parseLimit(Query $query, string $limit): string
+    {
+        $limitStr = '';
+
+        if (!empty($limit)) {
+            $limit = explode(',', $limit);
+            if (count($limit) > 1) {
+                $limitStr .= ' LIMIT ' . $limit[1] . ' OFFSET ' . $limit[0] . ' ';
+            } else {
+                $limitStr .= ' LIMIT ' . $limit[0] . ' ';
+            }
+        }
+
+        return $limitStr;
+    }
+
+    /**
      * 随机排序
      * @access protected
-     * @param  Query     $query        查询对象
+     * @param Query $query 查询对象
      * @return string
      */
     protected function parseRand(Query $query): string

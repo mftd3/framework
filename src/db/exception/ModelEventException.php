@@ -1,6 +1,6 @@
 <?php
 
-namespace think\db\exception;
+namespace mftd\db\exception;
 
 /**
  * 模型事件异常

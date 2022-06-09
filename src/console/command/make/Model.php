@@ -1,8 +1,8 @@
 <?php
 
-namespace think\console\command\make;
+namespace mftd\console\command\make;
 
-use think\console\command\Make;
+use mftd\console\command\Make;
 
 class Model extends Make
 {
@@ -15,13 +15,13 @@ class Model extends Make
             ->setDescription('Create a new model class');
     }
 
-    protected function getStub(): string
-    {
-        return __DIR__ . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'model.stub';
-    }
-
     protected function getNamespace(string $app): string
     {
         return parent::getNamespace($app) . '\\model';
+    }
+
+    protected function getStub(): string
+    {
+        return __DIR__ . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'model.stub';
     }
 }

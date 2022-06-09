@@ -1,21 +1,20 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
 /**
  * 数据库管理类
- * @package think
+ * @package mftd
  * @property Config $config
  */
 class Db extends DbManager
 {
     /**
-     * @param Event  $event
+     * @param Event $event
      * @param Config $config
-     * @param Log    $log
-     * @param Cache  $cache
+     * @param Log $log
+     * @param Cache $cache
      * @return Db
      * @codeCoverageIgnore
      */
@@ -34,12 +33,33 @@ class Db extends DbManager
     }
 
     /**
-     * 注入模型对象
+     * 注册回调方法
      * @access public
+     * @param string $event 事件名
+     * @param callable $callback 回调方法
      * @return void
      */
-    protected function modelMaker()
+    public function event(string $event, callable $callback): void
     {
+        if ($this->event) {
+            $this->event->listen('db.' . $event, $callback);
+        }
+    }
+
+    /**
+     * 获取配置参数
+     * @access public
+     * @param string $name 配置参数
+     * @param mixed $default 默认值
+     * @return mixed
+     */
+    public function getConfig(string $name = '', $default = null)
+    {
+        if ('' !== $name) {
+            return $this->config->get('database.' . $name, $default);
+        }
+
+        return $this->config->get('database', []);
     }
 
     /**
@@ -54,22 +74,6 @@ class Db extends DbManager
     }
 
     /**
-     * 获取配置参数
-     * @access public
-     * @param string $name    配置参数
-     * @param mixed  $default 默认值
-     * @return mixed
-     */
-    public function getConfig(string $name = '', $default = null)
-    {
-        if ('' !== $name) {
-            return $this->config->get('database.' . $name, $default);
-        }
-
-        return $this->config->get('database', []);
-    }
-
-    /**
      * 设置Event对象
      * @param Event $event
      */
@@ -79,25 +83,11 @@ class Db extends DbManager
     }
 
     /**
-     * 注册回调方法
-     * @access public
-     * @param string   $event    事件名
-     * @param callable $callback 回调方法
-     * @return void
-     */
-    public function event(string $event, callable $callback): void
-    {
-        if ($this->event) {
-            $this->event->listen('db.' . $event, $callback);
-        }
-    }
-
-    /**
      * 触发事件
      * @access public
-     * @param string $event  事件名
-     * @param mixed  $params 传入参数
-     * @param bool   $once
+     * @param string $event 事件名
+     * @param mixed $params 传入参数
+     * @param bool $once
      * @return mixed
      */
     public function trigger(string $event, $params = null, bool $once = false)
@@ -105,5 +95,14 @@ class Db extends DbManager
         if ($this->event) {
             return $this->event->trigger('db.' . $event, $params, $once);
         }
+    }
+
+    /**
+     * 注入模型对象
+     * @access public
+     * @return void
+     */
+    protected function modelMaker()
+    {
     }
 }

@@ -1,70 +1,47 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\filesystem;
+namespace mftd\filesystem;
 
-use League\Flysystem\AdapterInterface;
+use Closure;
 use League\Flysystem\Adapter\AbstractAdapter;
+use League\Flysystem\AdapterInterface;
 use League\Flysystem\Cached\CachedAdapter;
 use League\Flysystem\Cached\Storage\Memory as MemoryStore;
 use League\Flysystem\Filesystem;
+use mftd\Cache;
+use mftd\File;
 use RuntimeException;
-use think\Cache;
-use think\File;
 
 /**
  * Class Driver
- * @package think\filesystem
+ * @package mftd\filesystem
  * @mixin Filesystem
  */
 abstract class Driver
 {
     /** @var Cache */
     protected $cache;
-
-    /** @var Filesystem */
-    protected $filesystem;
-
     /**
      * 配置参数
      * @var array
      */
     protected $config = [];
+    /** @var Filesystem */
+    protected $filesystem;
 
     public function __construct(Cache $cache, array $config)
     {
-        $this->cache  = $cache;
+        $this->cache = $cache;
         $this->config = array_merge($this->config, $config);
 
-        $adapter          = $this->createAdapter();
+        $adapter = $this->createAdapter();
         $this->filesystem = $this->createFilesystem($adapter);
     }
 
-    protected function createCacheStore($config)
+    public function __call($method, $parameters)
     {
-        if (true === $config) {
-            return new MemoryStore();
-        }
-
-        return new CacheStore(
-            $this->cache->store($config['store']),
-            $config['prefix'] ?? 'flysystem',
-            $config['expire'] ?? null
-        );
-    }
-
-    abstract protected function createAdapter(): AdapterInterface;
-
-    protected function createFilesystem(AdapterInterface $adapter): Filesystem
-    {
-        if (!empty($this->config['cache'])) {
-            $adapter = new CachedAdapter($adapter, $this->createCacheStore($this->config['cache']));
-        }
-
-        $config = array_intersect_key($this->config, array_flip(['visibility', 'disable_asserts', 'url']));
-
-        return new Filesystem($adapter, count($config) > 0 ? $config : null);
+        return $this->filesystem->$method(...$parameters);
     }
 
     /**
@@ -83,22 +60,12 @@ abstract class Driver
         return $path;
     }
 
-    protected function concatPathToUrl($url, $path)
-    {
-        return rtrim($url, '/') . '/' . ltrim($path, '/');
-    }
-
-    public function url(string $path): string
-    {
-        throw new RuntimeException('This driver does not support retrieving URLs.');
-    }
-
     /**
      * 保存文件
-     * @param string               $path    路径
-     * @param File                 $file    文件
-     * @param null|string|\Closure $rule    文件名规则
-     * @param array                $options 参数
+     * @param string $path 路径
+     * @param File $file 文件
+     * @param null|string|Closure $rule 文件名规则
+     * @param array $options 参数
      * @return bool|string
      */
     public function putFile(string $path, File $file, $rule = null, array $options = [])
@@ -108,16 +75,16 @@ abstract class Driver
 
     /**
      * 指定文件名保存文件
-     * @param string $path    路径
-     * @param File   $file    文件
-     * @param string $name    文件名
-     * @param array  $options 参数
+     * @param string $path 路径
+     * @param File $file 文件
+     * @param string $name 文件名
+     * @param array $options 参数
      * @return bool|string
      */
     public function putFileAs(string $path, File $file, string $name, array $options = [])
     {
         $stream = fopen($file->getRealPath(), 'r');
-        $path   = trim($path . '/' . $name, '/');
+        $path = trim($path . '/' . $name, '/');
 
         $result = $this->putStream($path, $stream, $options);
 
@@ -128,8 +95,39 @@ abstract class Driver
         return $result ? $path : false;
     }
 
-    public function __call($method, $parameters)
+    public function url(string $path): string
     {
-        return $this->filesystem->$method(...$parameters);
+        throw new RuntimeException('This driver does not support retrieving URLs.');
+    }
+
+    protected function concatPathToUrl($url, $path)
+    {
+        return rtrim($url, '/') . '/' . ltrim($path, '/');
+    }
+
+    abstract protected function createAdapter(): AdapterInterface;
+
+    protected function createCacheStore($config)
+    {
+        if (true === $config) {
+            return new MemoryStore();
+        }
+
+        return new CacheStore(
+            $this->cache->store($config['store']),
+            $config['prefix'] ?? 'flysystem',
+            $config['expire'] ?? null
+        );
+    }
+
+    protected function createFilesystem(AdapterInterface $adapter): Filesystem
+    {
+        if (!empty($this->config['cache'])) {
+            $adapter = new CachedAdapter($adapter, $this->createCacheStore($this->config['cache']));
+        }
+
+        $config = array_intersect_key($this->config, array_flip(['visibility', 'disable_asserts', 'url']));
+
+        return new Filesystem($adapter, count($config) > 0 ? $config : null);
     }
 }

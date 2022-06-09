@@ -1,20 +1,19 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\facade;
+namespace mftd\facade;
 
-use think\console\Command;
-use think\console\Input;
-use think\console\input\Definition as InputDefinition;
-use think\console\Output;
-use think\console\output\driver\Buffer;
-use think\Facade;
+use mftd\console\Command;
+use mftd\console\Input;
+use mftd\console\input\Definition as InputDefinition;
+use mftd\console\Output;
+use mftd\console\output\driver\Buffer;
+use mftd\Facade;
 
 /**
  * Class Console
- * @package think\facade
- * @mixin \think\Console
+ * @package mftd\facade
+ * @mixin \mftd\Console
  * @method static Output|Buffer call(string $command, array $parameters = [], string $driver = 'buffer')
  * @method static int run() 执行当前的指令
  * @method static int doRun(Input $input, Output $output) 执行指令

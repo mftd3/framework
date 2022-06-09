@@ -3,7 +3,7 @@ declare (strict_types = 1);
 
 namespace {%namespace%};
 
-class {%className%} extends \think\Service
+class {%className%} extends \mftd\Service
 {
     /**
      * 注册服务

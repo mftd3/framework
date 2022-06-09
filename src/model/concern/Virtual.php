@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\model\concern;
+namespace mftd\model\concern;
 
-use think\db\BaseQuery as Query;
-use think\db\exception\DbException as Exception;
+use mftd\db\BaseQuery as Query;
+use mftd\db\exception\DbException as Exception;
 
 /**
  * 虚拟模型
@@ -21,40 +20,6 @@ trait Virtual
     public function db($scope = []): Query
     {
         throw new Exception('virtual model not support db query');
-    }
-
-    /**
-     * 获取字段类型信息
-     * @access public
-     * @param string $field 字段名
-     * @return string|null
-     */
-    public function getFieldType(string $field)
-    {
-    }
-
-    /**
-     * 保存当前数据对象
-     * @access public
-     * @param array  $data     数据
-     * @param string $sequence 自增序列名
-     * @return bool
-     */
-    public function save(array $data = [], string $sequence = null): bool
-    {
-        // 数据对象赋值
-        $this->setAttrs($data);
-
-        if ($this->isEmpty() || false === $this->trigger('BeforeWrite')) {
-            return false;
-        }
-
-        // 写入回调
-        $this->trigger('AfterWrite');
-
-        $this->exists(true);
-
-        return true;
     }
 
     /**
@@ -76,6 +41,40 @@ trait Virtual
         $this->trigger('AfterDelete');
 
         $this->exists(false);
+
+        return true;
+    }
+
+    /**
+     * 获取字段类型信息
+     * @access public
+     * @param string $field 字段名
+     * @return string|null
+     */
+    public function getFieldType(string $field)
+    {
+    }
+
+    /**
+     * 保存当前数据对象
+     * @access public
+     * @param array $data 数据
+     * @param string $sequence 自增序列名
+     * @return bool
+     */
+    public function save(array $data = [], string $sequence = null): bool
+    {
+        // 数据对象赋值
+        $this->setAttrs($data);
+
+        if ($this->isEmpty() || false === $this->trigger('BeforeWrite')) {
+            return false;
+        }
+
+        // 写入回调
+        $this->trigger('AfterWrite');
+
+        $this->exists(true);
 
         return true;
     }

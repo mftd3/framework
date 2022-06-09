@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\console\command;
+namespace mftd\console\command;
 
-use think\console\Command;
-use think\console\input\Option;
+use mftd\console\Command;
+use mftd\console\input\Option;
 
 class VendorPublish extends Command
 {
@@ -30,10 +29,10 @@ class VendorPublish extends Command
                 //配置
                 $configDir = $this->app->getConfigPath();
 
-                if (!empty($package['extra']['think']['config'])) {
+                if (!empty($package['extra']['mftd']['config'])) {
                     $installPath = $this->app->getRootPath() . 'vendor/' . $package['name'] . DIRECTORY_SEPARATOR;
 
-                    foreach ((array) $package['extra']['think']['config'] as $name => $file) {
+                    foreach ((array)$package['extra']['mftd']['config'] as $name => $file) {
                         $target = $configDir . $name . '.php';
                         $source = $installPath . $file;
 

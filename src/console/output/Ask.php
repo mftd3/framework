@@ -1,31 +1,29 @@
 <?php
 
-namespace think\console\output;
+namespace mftd\console\output;
 
-use think\console\Input;
-use think\console\Output;
-use think\console\output\question\Choice;
-use think\console\output\question\Confirmation;
+use Exception;
+use mftd\console\Input;
+use mftd\console\Output;
+use mftd\console\output\question\Choice;
+use mftd\console\output\question\Confirmation;
+use RuntimeException;
 
 class Ask
 {
-    private static $stty;
-
-    private static $shell;
-
     /** @var  Input */
     protected $input;
-
     /** @var  Output */
     protected $output;
-
     /** @var  Question */
     protected $question;
+    private static $shell;
+    private static $stty;
 
     public function __construct(Input $input, Output $output, Question $question)
     {
-        $this->input    = $input;
-        $this->output   = $output;
+        $this->input = $input;
+        $this->output = $output;
         $this->question = $question;
     }
 
@@ -52,7 +50,7 @@ class Ask
     {
         $this->writePrompt();
 
-        $inputStream  = STDIN;
+        $inputStream = STDIN;
         $autocomplete = $this->question->getAutocompleterValues();
 
         if (null === $autocomplete || !$this->hasSttyAvailable()) {
@@ -60,7 +58,7 @@ class Ask
             if ($this->question->isHidden()) {
                 try {
                     $ret = trim($this->getHiddenResponse($inputStream));
-                } catch (\RuntimeException $e) {
+                } catch (RuntimeException $e) {
                     if (!$this->question->isHiddenFallback()) {
                         throw $e;
                     }
@@ -70,7 +68,7 @@ class Ask
             if (false === $ret) {
                 $ret = fgets($inputStream, 4096);
                 if (false === $ret) {
-                    throw new \RuntimeException('Aborted');
+                    throw new RuntimeException('Aborted');
                 }
                 $ret = trim($ret);
             }
@@ -87,14 +85,127 @@ class Ask
         return $ret;
     }
 
+    protected function getHiddenResponse($inputStream)
+    {
+        if ('\\' === DIRECTORY_SEPARATOR) {
+            $exe = __DIR__ . '/../bin/hiddeninput.exe';
+
+            $value = rtrim(shell_exec($exe));
+            $this->output->writeln('');
+
+            return $value;
+        }
+
+        if ($this->hasSttyAvailable()) {
+            $sttyMode = shell_exec('stty -g');
+
+            shell_exec('stty -echo');
+            $value = fgets($inputStream, 4096);
+            shell_exec(sprintf('stty %s', $sttyMode));
+
+            if (false === $value) {
+                throw new RuntimeException('Aborted');
+            }
+
+            $value = trim($value);
+            $this->output->writeln('');
+
+            return $value;
+        }
+
+        if (false !== $shell = $this->getShell()) {
+            $readCmd = $shell === 'csh' ? 'set mypassword = $<' : 'read -r mypassword';
+            $command = sprintf("/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'", $shell, $readCmd);
+            $value = rtrim(shell_exec($command));
+            $this->output->writeln('');
+
+            return $value;
+        }
+
+        throw new RuntimeException('Unable to hide the response.');
+    }
+
+    protected function validateAttempts($interviewer)
+    {
+        /** @var Exception $error */
+        $error = null;
+        $attempts = $this->question->getMaxAttempts();
+        while (null === $attempts || $attempts--) {
+            if (null !== $error) {
+                $this->output->error($error->getMessage());
+            }
+
+            try {
+                return call_user_func($this->question->getValidator(), $interviewer());
+            } catch (Exception $error) {
+            }
+        }
+
+        throw $error;
+    }
+
+    /**
+     * 显示问题的提示信息
+     */
+    protected function writePrompt()
+    {
+        $text = $this->question->getQuestion();
+        $default = $this->question->getDefault();
+
+        switch (true) {
+            case null === $default:
+                $text = sprintf(' <info>%s</info>:', $text);
+
+                break;
+
+            case $this->question instanceof Confirmation:
+                $text = sprintf(' <info>%s (yes/no)</info> [<comment>%s</comment>]:', $text, $default ? 'yes' : 'no');
+
+                break;
+
+            case $this->question instanceof Choice && $this->question->isMultiselect():
+                $choices = $this->question->getChoices();
+                $default = explode(',', $default);
+
+                foreach ($default as $key => $value) {
+                    $default[$key] = $choices[trim($value)];
+                }
+
+                $text = sprintf(' <info>%s</info> [<comment>%s</comment>]:', $text, implode(', ', $default));
+
+                break;
+
+            case $this->question instanceof Choice:
+                $choices = $this->question->getChoices();
+                $text = sprintf(' <info>%s</info> [<comment>%s</comment>]:', $text, $choices[$default]);
+
+                break;
+
+            default:
+                $text = sprintf(' <info>%s</info> [<comment>%s</comment>]:', $text, $default);
+        }
+
+        $this->output->writeln($text);
+
+        if ($this->question instanceof Choice) {
+            $width = max(array_map('strlen', array_keys($this->question->getChoices())));
+
+            foreach ($this->question->getChoices() as $key => $value) {
+                $this->output->writeln(sprintf("  [<comment>%-${width}s</comment>] %s", $key, $value));
+            }
+        }
+
+        $this->output->write(' > ');
+    }
+
     private function autocomplete($inputStream)
     {
         $autocomplete = $this->question->getAutocompleterValues();
-        $ret          = '';
+        $ret = '';
 
-        $i          = 0;
-        $ofs        = -1;
-        $matches    = $autocomplete;
+        $i = 0;
+        $ofs = -1;
+        $matches = $autocomplete;
         $numMatches = count($matches);
 
         $sttyMode = shell_exec('stty -g');
@@ -111,8 +222,8 @@ class Ask
                 }
 
                 if ($i === 0) {
-                    $ofs        = -1;
-                    $matches    = $autocomplete;
+                    $ofs = -1;
+                    $matches = $autocomplete;
                     $numMatches = count($matches);
                 } else {
                     $numMatches = 0;
@@ -157,7 +268,7 @@ class Ask
                 ++$i;
 
                 $numMatches = 0;
-                $ofs        = 0;
+                $ofs = 0;
 
                 foreach ($autocomplete as $value) {
                     if (0 === strpos($value, $ret) && $i !== strlen($value)) {
@@ -178,119 +289,6 @@ class Ask
         shell_exec(sprintf('stty %s', $sttyMode));
 
         return $ret;
-    }
-
-    protected function getHiddenResponse($inputStream)
-    {
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $exe = __DIR__ . '/../bin/hiddeninput.exe';
-
-            $value = rtrim(shell_exec($exe));
-            $this->output->writeln('');
-
-            return $value;
-        }
-
-        if ($this->hasSttyAvailable()) {
-            $sttyMode = shell_exec('stty -g');
-
-            shell_exec('stty -echo');
-            $value = fgets($inputStream, 4096);
-            shell_exec(sprintf('stty %s', $sttyMode));
-
-            if (false === $value) {
-                throw new \RuntimeException('Aborted');
-            }
-
-            $value = trim($value);
-            $this->output->writeln('');
-
-            return $value;
-        }
-
-        if (false !== $shell = $this->getShell()) {
-            $readCmd = $shell === 'csh' ? 'set mypassword = $<' : 'read -r mypassword';
-            $command = sprintf("/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'", $shell, $readCmd);
-            $value   = rtrim(shell_exec($command));
-            $this->output->writeln('');
-
-            return $value;
-        }
-
-        throw new \RuntimeException('Unable to hide the response.');
-    }
-
-    protected function validateAttempts($interviewer)
-    {
-        /** @var \Exception $error */
-        $error    = null;
-        $attempts = $this->question->getMaxAttempts();
-        while (null === $attempts || $attempts--) {
-            if (null !== $error) {
-                $this->output->error($error->getMessage());
-            }
-
-            try {
-                return call_user_func($this->question->getValidator(), $interviewer());
-            } catch (\Exception $error) {
-            }
-        }
-
-        throw $error;
-    }
-
-    /**
-     * 显示问题的提示信息
-     */
-    protected function writePrompt()
-    {
-        $text    = $this->question->getQuestion();
-        $default = $this->question->getDefault();
-
-        switch (true) {
-            case null === $default:
-                $text = sprintf(' <info>%s</info>:', $text);
-
-                break;
-
-            case $this->question instanceof Confirmation:
-                $text = sprintf(' <info>%s (yes/no)</info> [<comment>%s</comment>]:', $text, $default ? 'yes' : 'no');
-
-                break;
-
-            case $this->question instanceof Choice && $this->question->isMultiselect():
-                $choices = $this->question->getChoices();
-                $default = explode(',', $default);
-
-                foreach ($default as $key => $value) {
-                    $default[$key] = $choices[trim($value)];
-                }
-
-                $text = sprintf(' <info>%s</info> [<comment>%s</comment>]:', $text, implode(', ', $default));
-
-                break;
-
-            case $this->question instanceof Choice:
-                $choices = $this->question->getChoices();
-                $text    = sprintf(' <info>%s</info> [<comment>%s</comment>]:', $text, $choices[$default]);
-
-                break;
-
-            default:
-                $text = sprintf(' <info>%s</info> [<comment>%s</comment>]:', $text, $default);
-        }
-
-        $this->output->writeln($text);
-
-        if ($this->question instanceof Choice) {
-            $width = max(array_map('strlen', array_keys($this->question->getChoices())));
-
-            foreach ($this->question->getChoices() as $key => $value) {
-                $this->output->writeln(sprintf("  [<comment>%-${width}s</comment>] %s", $key, $value));
-            }
-        }
-
-        $this->output->write(' > ');
     }
 
     private function getShell()

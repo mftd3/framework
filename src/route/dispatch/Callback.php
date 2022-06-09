@@ -1,10 +1,9 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\route\dispatch;
+namespace mftd\route\dispatch;
 
-use think\route\Dispatch;
+use mftd\route\Dispatch;
 
 /**
  * Callback Dispatcher

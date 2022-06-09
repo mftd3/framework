@@ -1,9 +1,9 @@
 <?php
 
-namespace think\db\connector;
+namespace mftd\db\connector;
 
+use mftd\db\PDOConnection;
 use PDO;
-use think\db\PDOConnection;
 
 /**
  * Sqlite数据库驱动
@@ -11,40 +11,27 @@ use think\db\PDOConnection;
 class Sqlite extends PDOConnection
 {
     /**
-     * 解析pdo连接的dsn信息
-     * @access protected
-     * @param  array $config 连接信息
-     * @return string
-     */
-    protected function parseDsn(array $config): string
-    {
-        $dsn = 'sqlite:' . $config['database'];
-
-        return $dsn;
-    }
-
-    /**
      * 取得数据表的字段信息
      * @access public
-     * @param  string $tableName
+     * @param string $tableName
      * @return array
      */
     public function getFields(string $tableName): array
     {
         [$tableName] = explode(' ', $tableName);
-        $sql         = 'PRAGMA table_info( \'' . $tableName . '\' )';
+        $sql = 'PRAGMA table_info( \'' . $tableName . '\' )';
 
-        $pdo    = $this->getPDOStatement($sql);
+        $pdo = $this->getPDOStatement($sql);
         $result = $pdo->fetchAll(PDO::FETCH_ASSOC);
-        $info   = [];
+        $info = [];
 
         if (!empty($result)) {
             foreach ($result as $key => $val) {
                 $val = array_change_key_case($val);
 
                 $info[$val['name']] = [
-                    'name'    => $val['name'],
-                    'type'    => $val['type'],
+                    'name' => $val['name'],
+                    'type' => $val['type'],
                     'notnull' => 1 === $val['notnull'],
                     'default' => $val['dflt_value'],
                     'primary' => '1' == $val['pk'],
@@ -59,7 +46,7 @@ class Sqlite extends PDOConnection
     /**
      * 取得数据库的表信息
      * @access public
-     * @param  string $dbName
+     * @param string $dbName
      * @return array
      */
     public function getTables(string $dbName = ''): array
@@ -68,15 +55,28 @@ class Sqlite extends PDOConnection
             . "UNION ALL SELECT name FROM sqlite_temp_master "
             . "WHERE type='table' ORDER BY name";
 
-        $pdo    = $this->getPDOStatement($sql);
+        $pdo = $this->getPDOStatement($sql);
         $result = $pdo->fetchAll(PDO::FETCH_ASSOC);
-        $info   = [];
+        $info = [];
 
         foreach ($result as $key => $val) {
             $info[$key] = current($val);
         }
 
         return $info;
+    }
+
+    /**
+     * 解析pdo连接的dsn信息
+     * @access protected
+     * @param array $config 连接信息
+     * @return string
+     */
+    protected function parseDsn(array $config): string
+    {
+        $dsn = 'sqlite:' . $config['database'];
+
+        return $dsn;
     }
 
     protected function supportSavepoint(): bool

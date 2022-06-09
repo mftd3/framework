@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
 use InvalidArgumentException;
-use think\helper\Str;
+use mftd\helper\Str;
 
 abstract class Manager
 {
@@ -27,6 +26,66 @@ abstract class Manager
     public function __construct(App $app)
     {
         $this->app = $app;
+    }
+
+    /**
+     * 动态调用
+     * @param string $method
+     * @param array $parameters
+     * @return mixed
+     */
+    public function __call($method, $parameters)
+    {
+        return $this->driver()->$method(...$parameters);
+    }
+
+    /**
+     * 移除一个驱动实例
+     *
+     * @param array|string|null $name
+     * @return $this
+     */
+    public function forgetDriver($name = null)
+    {
+        $name = $name ?? $this->getDefaultDriver();
+
+        foreach ((array)$name as $cacheName) {
+            if (isset($this->drivers[$cacheName])) {
+                unset($this->drivers[$cacheName]);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * 默认驱动
+     * @return string|null
+     */
+    abstract public function getDefaultDriver();
+
+    /**
+     * 创建驱动
+     *
+     * @param string $name
+     * @return mixed
+     *
+     */
+    protected function createDriver(string $name)
+    {
+        $type = $this->resolveType($name);
+
+        $method = 'create' . Str::studly($type) . 'Driver';
+
+        $params = $this->resolveParams($name);
+
+        if (method_exists($this, $method)) {
+            return $this->$method(...$params);
+        }
+
+        $class = $this->resolveClass($type);
+
+        return $this->app->invokeClass($class, $params);
     }
 
     /**
@@ -59,26 +118,6 @@ abstract class Manager
     }
 
     /**
-     * 获取驱动类型
-     * @param string $name
-     * @return mixed
-     */
-    protected function resolveType(string $name)
-    {
-        return $name;
-    }
-
-    /**
-     * 获取驱动配置
-     * @param string $name
-     * @return mixed
-     */
-    protected function resolveConfig(string $name)
-    {
-        return $name;
-    }
-
-    /**
      * 获取驱动类
      * @param string $type
      * @return string
@@ -97,6 +136,16 @@ abstract class Manager
     }
 
     /**
+     * 获取驱动配置
+     * @param string $name
+     * @return mixed
+     */
+    protected function resolveConfig(string $name)
+    {
+        return $name;
+    }
+
+    /**
      * 获取驱动参数
      * @param $name
      * @return array
@@ -108,62 +157,12 @@ abstract class Manager
     }
 
     /**
-     * 创建驱动
-     *
+     * 获取驱动类型
      * @param string $name
      * @return mixed
-     *
      */
-    protected function createDriver(string $name)
+    protected function resolveType(string $name)
     {
-        $type = $this->resolveType($name);
-
-        $method = 'create' . Str::studly($type) . 'Driver';
-
-        $params = $this->resolveParams($name);
-
-        if (method_exists($this, $method)) {
-            return $this->$method(...$params);
-        }
-
-        $class = $this->resolveClass($type);
-
-        return $this->app->invokeClass($class, $params);
-    }
-
-    /**
-     * 移除一个驱动实例
-     *
-     * @param array|string|null $name
-     * @return $this
-     */
-    public function forgetDriver($name = null)
-    {
-        $name = $name ?? $this->getDefaultDriver();
-
-        foreach ((array) $name as $cacheName) {
-            if (isset($this->drivers[$cacheName])) {
-                unset($this->drivers[$cacheName]);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * 默认驱动
-     * @return string|null
-     */
-    abstract public function getDefaultDriver();
-
-    /**
-     * 动态调用
-     * @param string $method
-     * @param array  $parameters
-     * @return mixed
-     */
-    public function __call($method, $parameters)
-    {
-        return $this->driver()->$method(...$parameters);
+        return $name;
     }
 }

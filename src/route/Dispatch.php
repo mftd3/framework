@@ -1,15 +1,16 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\route;
+namespace mftd\route;
 
+use Closure;
+use mftd\App;
+use mftd\Container;
+use mftd\exception\ValidateException;
+use mftd\Request;
+use mftd\Response;
+use mftd\Validate;
 use Psr\Http\Message\ResponseInterface;
-use think\App;
-use think\Container;
-use think\Request;
-use think\Response;
-use think\Validate;
 
 /**
  * 路由调度基础类
@@ -18,40 +19,68 @@ abstract class Dispatch
 {
     /**
      * 应用对象
-     * @var \think\App
+     * @var App
      */
     protected $app;
-
+    /**
+     * 调度信息
+     * @var mixed
+     */
+    protected $dispatch;
+    /**
+     * 路由变量
+     * @var array
+     */
+    protected $param;
     /**
      * 请求对象
      * @var Request
      */
     protected $request;
-
     /**
      * 路由规则
      * @var Rule
      */
     protected $rule;
 
-    /**
-     * 调度信息
-     * @var mixed
-     */
-    protected $dispatch;
-
-    /**
-     * 路由变量
-     * @var array
-     */
-    protected $param;
-
     public function __construct(Request $request, Rule $rule, $dispatch, array $param = [])
     {
-        $this->request  = $request;
-        $this->rule     = $rule;
+        $this->request = $request;
+        $this->rule = $rule;
         $this->dispatch = $dispatch;
-        $this->param    = $param;
+        $this->param = $param;
+    }
+
+    public function __debugInfo()
+    {
+        return [
+            'dispatch' => $this->dispatch,
+            'param' => $this->param,
+            'rule' => $this->rule,
+        ];
+    }
+
+    public function __sleep()
+    {
+        return ['rule', 'dispatch', 'param', 'controller', 'actionName'];
+    }
+
+    public function __wakeup()
+    {
+        $this->app = Container::pull('app');
+        $this->request = $this->app->request;
+    }
+
+    abstract public function exec();
+
+    public function getDispatch()
+    {
+        return $this->dispatch;
+    }
+
+    public function getParam(): array
+    {
+        return $this->param;
     }
 
     public function init(App $app)
@@ -88,24 +117,103 @@ abstract class Dispatch
         if ($data instanceof Response) {
             $response = $data;
         } elseif ($data instanceof ResponseInterface) {
-            $response = Response::create((string) $data->getBody(), 'html', $data->getStatusCode());
+            $response = Response::create((string)$data->getBody(), 'html', $data->getStatusCode());
 
             foreach ($data->getHeaders() as $header => $values) {
                 $response->header([$header => implode(", ", $values)]);
             }
         } elseif (!is_null($data)) {
             // 默认自动识别响应输出类型
-            $type     = $this->request->isJson() ? 'json' : 'html';
+            $type = $this->request->isJson() ? 'json' : 'html';
             $response = Response::create($data, $type);
         } else {
             $data = ob_get_clean();
 
-            $content  = false === $data ? '' : $data;
-            $status   = '' === $content && $this->request->isJson() ? 204 : 200;
+            $content = false === $data ? '' : $data;
+            $status = '' === $content && $this->request->isJson() ? 204 : 200;
             $response = Response::create($content, 'html', $status);
         }
 
         return $response;
+    }
+
+    /**
+     * 验证数据
+     * @access protected
+     * @param array $option
+     * @return void
+     * @throws ValidateException
+     */
+    protected function autoValidate(array $option): void
+    {
+        [$validate, $scene, $message, $batch] = $option;
+
+        if (is_array($validate)) {
+            // 指定验证规则
+            $v = new Validate();
+            $v->rule($validate);
+        } else {
+            // 调用验证器
+            $class = false !== strpos($validate, '\\') ? $validate : $this->app->parseClass('validate', $validate);
+
+            $v = new $class();
+
+            if (!empty($scene)) {
+                $v->scene($scene);
+            }
+        }
+
+        /** @var Validate $v */
+        $v->message($message)
+            ->batch($batch)
+            ->failException(true)
+            ->check($this->request->param());
+    }
+
+    /**
+     * 路由绑定模型实例
+     * @access protected
+     * @param array $bindModel 绑定模型
+     * @param array $matches 路由变量
+     * @return void
+     */
+    protected function createBindModel(array $bindModel, array $matches): void
+    {
+        foreach ($bindModel as $key => $val) {
+            if ($val instanceof Closure) {
+                $result = $this->app->invokeFunction($val, $matches);
+            } else {
+                $fields = explode('&', $key);
+
+                if (is_array($val)) {
+                    [$model, $exception] = $val;
+                } else {
+                    $model = $val;
+                    $exception = true;
+                }
+
+                $where = [];
+                $match = true;
+
+                foreach ($fields as $field) {
+                    if (!isset($matches[$field])) {
+                        $match = false;
+                        break;
+                    } else {
+                        $where[] = [$field, '=', $matches[$field]];
+                    }
+                }
+
+                if ($match) {
+                    $result = $model::where($where)->failException($exception)->find();
+                }
+            }
+
+            if (!empty($result)) {
+                // 注入容器
+                $this->app->instance(get_class($result), $result);
+            }
+        }
     }
 
     /**
@@ -141,116 +249,5 @@ abstract class Dispatch
         if (isset($option['validate'])) {
             $this->autoValidate($option['validate']);
         }
-    }
-
-    /**
-     * 路由绑定模型实例
-     * @access protected
-     * @param array $bindModel 绑定模型
-     * @param array $matches   路由变量
-     * @return void
-     */
-    protected function createBindModel(array $bindModel, array $matches): void
-    {
-        foreach ($bindModel as $key => $val) {
-            if ($val instanceof \Closure) {
-                $result = $this->app->invokeFunction($val, $matches);
-            } else {
-                $fields = explode('&', $key);
-
-                if (is_array($val)) {
-                    [$model, $exception] = $val;
-                } else {
-                    $model     = $val;
-                    $exception = true;
-                }
-
-                $where = [];
-                $match = true;
-
-                foreach ($fields as $field) {
-                    if (!isset($matches[$field])) {
-                        $match = false;
-                        break;
-                    } else {
-                        $where[] = [$field, '=', $matches[$field]];
-                    }
-                }
-
-                if ($match) {
-                    $result = $model::where($where)->failException($exception)->find();
-                }
-            }
-
-            if (!empty($result)) {
-                // 注入容器
-                $this->app->instance(get_class($result), $result);
-            }
-        }
-    }
-
-    /**
-     * 验证数据
-     * @access protected
-     * @param array $option
-     * @return void
-     * @throws \think\exception\ValidateException
-     */
-    protected function autoValidate(array $option): void
-    {
-        [$validate, $scene, $message, $batch] = $option;
-
-        if (is_array($validate)) {
-            // 指定验证规则
-            $v = new Validate();
-            $v->rule($validate);
-        } else {
-            // 调用验证器
-            $class = false !== strpos($validate, '\\') ? $validate : $this->app->parseClass('validate', $validate);
-
-            $v = new $class();
-
-            if (!empty($scene)) {
-                $v->scene($scene);
-            }
-        }
-
-        /** @var Validate $v */
-        $v->message($message)
-            ->batch($batch)
-            ->failException(true)
-            ->check($this->request->param());
-    }
-
-    public function getDispatch()
-    {
-        return $this->dispatch;
-    }
-
-    public function getParam(): array
-    {
-        return $this->param;
-    }
-
-    abstract public function exec();
-
-    public function __sleep()
-    {
-        return ['rule', 'dispatch', 'param', 'controller', 'actionName'];
-    }
-
-    public function __wakeup()
-    {
-        $this->app     = Container::pull('app');
-        $this->request = $this->app->request;
-    }
-
-    public function __debugInfo()
-    {
-        return [
-            'dispatch' => $this->dispatch,
-            'param'    => $this->param,
-            'rule'     => $this->rule,
-        ];
     }
 }

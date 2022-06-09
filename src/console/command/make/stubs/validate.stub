@@ -3,7 +3,7 @@ declare (strict_types = 1);
 
 namespace {%namespace%};
 
-use think\Validate;
+use mftd\Validate;
 
 class {%className%} extends Validate
 {

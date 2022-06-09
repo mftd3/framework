@@ -1,8 +1,7 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\db\exception;
+namespace mftd\db\exception;
 
 class DataNotFoundException extends DbException
 {
@@ -11,14 +10,14 @@ class DataNotFoundException extends DbException
     /**
      * DbException constructor.
      * @access public
-     * @param  string $message
-     * @param  string $table
-     * @param  array $config
+     * @param string $message
+     * @param string $table
+     * @param array $config
      */
     public function __construct(string $message, string $table = '', array $config = [])
     {
         $this->message = $message;
-        $this->table   = $table;
+        $this->table = $table;
 
         $this->setData('Database Config', $config);
     }

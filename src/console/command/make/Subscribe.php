@@ -1,8 +1,8 @@
 <?php
 
-namespace think\console\command\make;
+namespace mftd\console\command\make;
 
-use think\console\command\Make;
+use mftd\console\command\Make;
 
 class Subscribe extends Make
 {
@@ -15,13 +15,13 @@ class Subscribe extends Make
             ->setDescription('Create a new subscribe class');
     }
 
-    protected function getStub(): string
-    {
-        return __DIR__ . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'subscribe.stub';
-    }
-
     protected function getNamespace(string $app): string
     {
         return parent::getNamespace($app) . '\\subscribe';
+    }
+
+    protected function getStub(): string
+    {
+        return __DIR__ . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'subscribe.stub';
     }
 }

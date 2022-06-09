@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\db\concern;
+namespace mftd\db\concern;
 
-use think\db\exception\DbException;
-use think\db\Raw;
+use mftd\db\exception\DbException;
+use mftd\db\Raw;
 
 /**
  * 聚合查询
@@ -13,16 +12,14 @@ use think\db\Raw;
 trait AggregateQuery
 {
     /**
-     * 聚合查询
-     * @access protected
-     * @param string     $aggregate 聚合方法
-     * @param string|Raw $field     字段名
-     * @param bool       $force     强制转为数字类型
-     * @return mixed
+     * AVG查询
+     * @access public
+     * @param string|Raw $field 字段名
+     * @return float
      */
-    protected function aggregate(string $aggregate, $field, bool $force = false)
+    public function avg($field): float
     {
-        return $this->connection->aggregate($this, $aggregate, $field, $force);
+        return $this->aggregate('AVG', $field, true);
     }
 
     /**
@@ -41,8 +38,8 @@ trait AggregateQuery
             }
 
             $options = $this->getOptions();
-            $subSql  = $this->options($options)
-                ->field('count(' . $field . ') AS think_count')
+            $subSql = $this->options($options)
+                ->field('count(' . $field . ') AS mftd_count')
                 ->bind($this->bind)
                 ->buildSql();
 
@@ -53,7 +50,31 @@ trait AggregateQuery
             $count = $this->aggregate('COUNT', $field);
         }
 
-        return (int) $count;
+        return (int)$count;
+    }
+
+    /**
+     * MAX查询
+     * @access public
+     * @param string|Raw $field 字段名
+     * @param bool $force 强制转为数字类型
+     * @return mixed
+     */
+    public function max($field, bool $force = true)
+    {
+        return $this->aggregate('MAX', $field, $force);
+    }
+
+    /**
+     * MIN查询
+     * @access public
+     * @param string|Raw $field 字段名
+     * @param bool $force 强制转为数字类型
+     * @return mixed
+     */
+    public function min($field, bool $force = true)
+    {
+        return $this->aggregate('MIN', $field, $force);
     }
 
     /**
@@ -68,37 +89,15 @@ trait AggregateQuery
     }
 
     /**
-     * MIN查询
-     * @access public
+     * 聚合查询
+     * @access protected
+     * @param string $aggregate 聚合方法
      * @param string|Raw $field 字段名
-     * @param bool       $force 强制转为数字类型
+     * @param bool $force 强制转为数字类型
      * @return mixed
      */
-    public function min($field, bool $force = true)
+    protected function aggregate(string $aggregate, $field, bool $force = false)
     {
-        return $this->aggregate('MIN', $field, $force);
-    }
-
-    /**
-     * MAX查询
-     * @access public
-     * @param string|Raw $field 字段名
-     * @param bool       $force 强制转为数字类型
-     * @return mixed
-     */
-    public function max($field, bool $force = true)
-    {
-        return $this->aggregate('MAX', $field, $force);
-    }
-
-    /**
-     * AVG查询
-     * @access public
-     * @param string|Raw $field 字段名
-     * @return float
-     */
-    public function avg($field): float
-    {
-        return $this->aggregate('AVG', $field, true);
+        return $this->connection->aggregate($this, $aggregate, $field, $force);
     }
 }

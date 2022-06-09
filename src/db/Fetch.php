@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\db;
+namespace mftd\db;
 
-use think\db\exception\DbException as Exception;
-use think\helper\Str;
+use mftd\db\exception\DbException as Exception;
+use mftd\helper\Str;
 
 /**
  * SQL获取类
@@ -13,86 +12,65 @@ use think\helper\Str;
 class Fetch
 {
     /**
+     * Builder对象
+     * @var Builder
+     */
+    protected $builder;
+    /**
+     * Connection对象
+     * @var Connection
+     */
+    protected $connection;
+    /**
      * 查询对象
      * @var Query
      */
     protected $query;
 
     /**
-     * Connection对象
-     * @var Connection
-     */
-    protected $connection;
-
-    /**
-     * Builder对象
-     * @var Builder
-     */
-    protected $builder;
-
-    /**
      * 创建一个查询SQL获取对象
      *
-     * @param  Query    $query      查询对象
+     * @param Query $query 查询对象
      */
     public function __construct(Query $query)
     {
-        $this->query      = $query;
+        $this->query = $query;
         $this->connection = $query->getConnection();
-        $this->builder    = $this->connection->getBuilder();
+        $this->builder = $this->connection->getBuilder();
     }
 
-    /**
-     * 聚合查询
-     * @access protected
-     * @param  string $aggregate    聚合方法
-     * @param  string $field        字段名
-     * @return string
-     */
-    protected function aggregate(string $aggregate, string $field): string
+    public function __call($method, $args)
     {
-        $this->query->parseOptions();
+        if (strtolower(substr($method, 0, 5)) == 'getby') {
+            // 根据某个字段获取记录
+            $field = Str::snake(substr($method, 5));
+            return $this->where($field, '=', $args[0])->find();
+        } elseif (strtolower(substr($method, 0, 10)) == 'getfieldby') {
+            // 根据某个字段获取记录的某个值
+            $name = Str::snake(substr($method, 10));
+            return $this->where($name, '=', $args[0])->value($args[1]);
+        }
 
-        $field = $aggregate . '(' . $this->builder->parseKey($this->query, $field) . ') AS think_' . strtolower($aggregate);
-
-        return $this->value($field, 0, false);
+        $result = call_user_func_array([$this->query, $method], $args);
+        return $result === $this->query ? $this : $result;
     }
 
     /**
-     * 得到某个字段的值
+     * AVG查询
      * @access public
      * @param string $field 字段名
-     * @param mixed $default 默认值
-     * @param bool $one
      * @return string
      */
-    public function value(string $field, $default = null, bool $one = true): string
+    public function avg(string $field): string
     {
-        $options = $this->query->parseOptions();
-
-        if (isset($options['field'])) {
-            $this->query->removeOption('field');
-        }
-
-        $this->query->setOption('field', (array) $field);
-
-        // 生成查询SQL
-        $sql = $this->builder->select($this->query, $one);
-
-        if (isset($options['field'])) {
-            $this->query->setOption('field', $options['field']);
-        } else {
-            $this->query->removeOption('field');
-        }
-
-        return $this->fetch($sql);
+        return $this->aggregate('AVG', $field);
     }
 
     /**
      * 得到某个列的数组
      * @access public
-     * @param  string $field 字段名 多个字段用逗号分隔
-     * @param  string $key   索引
+     * @param string $field 字段名 多个字段用逗号分隔
+     * @param string $key 索引
      * @return string
      */
     public function column(string $field, string $key = ''): string
@@ -124,9 +102,120 @@ class Fetch
     }
 
     /**
+     * COUNT查询
+     * @access public
+     * @param string $field 字段名
+     * @return string
+     */
+    public function count(string $field = '*'): string
+    {
+        $options = $this->query->parseOptions();
+
+        if (!empty($options['group'])) {
+            // 支持GROUP
+            $subSql = $this->query->field('count(' . $field . ') AS mftd_count')->buildSql();
+            $query = $this->query->newQuery()->table([$subSql => '_group_count_']);
+
+            return $query->fetchsql()->aggregate('COUNT', '*');
+        } else {
+            return $this->aggregate('COUNT', $field);
+        }
+    }
+
+    /**
+     * 删除记录
+     * @access public
+     * @param mixed $data 表达式 true 表示强制删除
+     * @return string
+     */
+    public function delete($data = null): string
+    {
+        $options = $this->query->parseOptions();
+
+        if (!is_null($data) && true !== $data) {
+            // AR模式分析主键条件
+            $this->query->parsePkWhere($data);
+        }
+
+        if (!empty($options['soft_delete'])) {
+            // 软删除
+            [$field, $condition] = $options['soft_delete'];
+            if ($condition) {
+                $this->query->setOption('soft_delete', null);
+                $this->query->setOption('data', [$field => $condition]);
+                // 生成删除SQL语句
+                $sql = $this->builder->delete($this->query);
+                return $this->fetch($sql);
+            }
+        }
+
+        // 生成删除SQL语句
+        $sql = $this->builder->delete($this->query);
+
+        return $this->fetch($sql);
+    }
+
+    /**
+     * 获取实际的SQL语句
+     * @access public
+     * @param string $sql
+     * @return string
+     */
+    public function fetch(string $sql): string
+    {
+        $bind = $this->query->getBind();
+
+        return $this->connection->getRealSql($sql, $bind);
+    }
+
+    /**
+     * 查找单条记录 返回SQL语句
+     * @access public
+     * @param mixed $data
+     * @return string
+     */
+    public function find($data = null): string
+    {
+        $this->query->parseOptions();
+
+        if (!is_null($data)) {
+            // AR模式分析主键条件
+            $this->query->parsePkWhere($data);
+        }
+
+        // 生成查询SQL
+        $sql = $this->builder->select($this->query, true);
+
+        // 获取实际执行的SQL语句
+        return $this->fetch($sql);
+    }
+
+    /**
+     * 查找单条记录 不存在返回空数据（或者空模型）
+     * @access public
+     * @param mixed $data 数据
+     * @return string
+     */
+    public function findOrEmpty($data = null)
+    {
+        return $this->find($data);
+    }
+
+    /**
+     * 查找单条记录 如果不存在则抛出异常
+     * @access public
+     * @param mixed $data
+     * @return string
+     */
+    public function findOrFail($data = null): string
+    {
+        return $this->find($data);
+    }
+
+    /**
      * 插入记录
      * @access public
-     * @param  array $data 数据
+     * @param array $data 数据
      * @return string
      */
     public function insert(array $data = []): string
@@ -143,9 +232,46 @@ class Fetch
     }
 
     /**
+     * 批量插入记录
+     * @access public
+     * @param array $dataSet 数据集
+     * @param integer $limit 每次写入数据限制
+     * @return string
+     */
+    public function insertAll(array $dataSet = [], int $limit = null): string
+    {
+        $options = $this->query->parseOptions();
+
+        if (empty($dataSet)) {
+            $dataSet = $options['data'];
+        }
+
+        if (empty($limit) && !empty($options['limit'])) {
+            $limit = $options['limit'];
+        }
+
+        if ($limit) {
+            $array = array_chunk($dataSet, $limit, true);
+            $fetchSql = [];
+            foreach ($array as $item) {
+                $sql = $this->builder->insertAll($this->query, $item);
+                $bind = $this->query->getBind();
+
+                $fetchSql[] = $this->connection->getRealSql($sql, $bind);
+            }
+
+            return implode(';', $fetchSql);
+        }
+
+        $sql = $this->builder->insertAll($this->query, $dataSet);
+
+        return $this->fetch($sql);
+    }
+
+    /**
      * 插入记录并获取自增ID
      * @access public
-     * @param  array $data 数据
+     * @param array $data 数据
      * @return string
      */
     public function insertGetId(array $data = []): string
@@ -154,10 +280,32 @@ class Fetch
     }
 
     /**
+     * MAX查询
+     * @access public
+     * @param string $field 字段名
+     * @return string
+     */
+    public function max(string $field): string
+    {
+        return $this->aggregate('MAX', $field);
+    }
+
+    /**
+     * MIN查询
+     * @access public
+     * @param string $field 字段名
+     * @return string
+     */
+    public function min(string $field): string
+    {
+        return $this->aggregate('MIN', $field);
+    }
+
+    /**
      * 保存数据 自动判断insert或者update
      * @access public
-     * @param  array $data        数据
-     * @param  bool  $forceInsert 是否强制insert
+     * @param array $data 数据
+     * @param bool $forceInsert 是否强制insert
      * @return string
      */
     public function save(array $data = [], bool $forceInsert = false): string
@@ -180,38 +328,22 @@ class Fetch
     }
 
     /**
-     * 批量插入记录
+     * 查找记录 返回SQL
      * @access public
-     * @param  array     $dataSet 数据集
-     * @param  integer   $limit   每次写入数据限制
+     * @param mixed $data
      * @return string
      */
-    public function insertAll(array $dataSet = [], int $limit = null): string
+    public function select($data = null): string
     {
-        $options = $this->query->parseOptions();
+        $this->query->parseOptions();
 
-        if (empty($dataSet)) {
-            $dataSet = $options['data'];
+        if (!is_null($data)) {
+            // 主键条件分析
+            $this->query->parsePkWhere($data);
         }
 
-        if (empty($limit) && !empty($options['limit'])) {
-            $limit = $options['limit'];
-        }
-
-        if ($limit) {
-            $array    = array_chunk($dataSet, $limit, true);
-            $fetchSql = [];
-            foreach ($array as $item) {
-                $sql  = $this->builder->insertAll($this->query, $item);
-                $bind = $this->query->getBind();
-
-                $fetchSql[] = $this->connection->getRealSql($sql, $bind);
-            }
-
-            return implode(';', $fetchSql);
-        }
-
-        $sql = $this->builder->insertAll($this->query, $dataSet);
+        // 生成查询SQL
+        $sql = $this->builder->select($this->query);
 
         return $this->fetch($sql);
     }
@@ -219,8 +351,8 @@ class Fetch
     /**
      * 通过Select方式插入记录
      * @access public
-     * @param  array    $fields 要插入的数据表字段名
-     * @param  string   $table  要插入的数据表名
+     * @param array $fields 要插入的数据表字段名
+     * @param string $table 要插入的数据表名
      * @return string
      */
     public function selectInsert(array $fields, string $table): string
@@ -233,9 +365,31 @@ class Fetch
     }
 
     /**
+     * 查找多条记录 如果不存在则抛出异常
+     * @access public
+     * @param mixed $data
+     * @return string
+     */
+    public function selectOrFail($data = null): string
+    {
+        return $this->select($data);
+    }
+
+    /**
+     * SUM查询
+     * @access public
+     * @param string $field 字段名
+     * @return string
+     */
+    public function sum(string $field): string
+    {
+        return $this->aggregate('SUM', $field);
+    }
+
+    /**
      * 更新记录
      * @access public
-     * @param  mixed $data 数据
+     * @param mixed $data 数据
      * @return string
      */
     public function update(array $data = []): string
@@ -280,205 +434,48 @@ class Fetch
     }
 
     /**
-     * 删除记录
+     * 得到某个字段的值
      * @access public
-     * @param  mixed $data 表达式 true 表示强制删除
+     * @param string $field 字段名
+     * @param mixed $default 默认值
+     * @param bool $one
      * @return string
      */
-    public function delete($data = null): string
+    public function value(string $field, $default = null, bool $one = true): string
     {
         $options = $this->query->parseOptions();
 
-        if (!is_null($data) && true !== $data) {
-            // AR模式分析主键条件
-            $this->query->parsePkWhere($data);
+        if (isset($options['field'])) {
+            $this->query->removeOption('field');
         }
 
-        if (!empty($options['soft_delete'])) {
-            // 软删除
-            [$field, $condition] = $options['soft_delete'];
-            if ($condition) {
-                $this->query->setOption('soft_delete', null);
-                $this->query->setOption('data', [$field => $condition]);
-                // 生成删除SQL语句
-                $sql = $this->builder->delete($this->query);
-                return $this->fetch($sql);
-            }
-        }
-
-        // 生成删除SQL语句
-        $sql = $this->builder->delete($this->query);
-
-        return $this->fetch($sql);
-    }
-
-    /**
-     * 查找记录 返回SQL
-     * @access public
-     * @param  mixed $data
-     * @return string
-     */
-    public function select($data = null): string
-    {
-        $this->query->parseOptions();
-
-        if (!is_null($data)) {
-            // 主键条件分析
-            $this->query->parsePkWhere($data);
-        }
+        $this->query->setOption('field', (array)$field);
 
         // 生成查询SQL
-        $sql = $this->builder->select($this->query);
+        $sql = $this->builder->select($this->query, $one);
 
-        return $this->fetch($sql);
-    }
-
-    /**
-     * 查找单条记录 返回SQL语句
-     * @access public
-     * @param  mixed $data
-     * @return string
-     */
-    public function find($data = null): string
-    {
-        $this->query->parseOptions();
-
-        if (!is_null($data)) {
-            // AR模式分析主键条件
-            $this->query->parsePkWhere($data);
-        }
-
-        // 生成查询SQL
-        $sql = $this->builder->select($this->query, true);
-
-        // 获取实际执行的SQL语句
-        return $this->fetch($sql);
-    }
-
-    /**
-     * 查找多条记录 如果不存在则抛出异常
-     * @access public
-     * @param  mixed $data
-     * @return string
-     */
-    public function selectOrFail($data = null): string
-    {
-        return $this->select($data);
-    }
-
-    /**
-     * 查找单条记录 如果不存在则抛出异常
-     * @access public
-     * @param  mixed $data
-     * @return string
-     */
-    public function findOrFail($data = null): string
-    {
-        return $this->find($data);
-    }
-
-    /**
-     * 查找单条记录 不存在返回空数据（或者空模型）
-     * @access public
-     * @param  mixed $data 数据
-     * @return string
-     */
-    public function findOrEmpty($data = null)
-    {
-        return $this->find($data);
-    }
-
-    /**
-     * 获取实际的SQL语句
-     * @access public
-     * @param  string $sql
-     * @return string
-     */
-    public function fetch(string $sql): string
-    {
-        $bind = $this->query->getBind();
-
-        return $this->connection->getRealSql($sql, $bind);
-    }
-
-    /**
-     * COUNT查询
-     * @access public
-     * @param  string $field 字段名
-     * @return string
-     */
-    public function count(string $field = '*'): string
-    {
-        $options = $this->query->parseOptions();
-
-        if (!empty($options['group'])) {
-            // 支持GROUP
-            $subSql = $this->query->field('count(' . $field . ') AS think_count')->buildSql();
-            $query  = $this->query->newQuery()->table([$subSql => '_group_count_']);
-
-            return $query->fetchsql()->aggregate('COUNT', '*');
+        if (isset($options['field'])) {
+            $this->query->setOption('field', $options['field']);
         } else {
-            return $this->aggregate('COUNT', $field);
-        }
-    }
-
-    /**
-     * SUM查询
-     * @access public
-     * @param  string $field 字段名
-     * @return string
-     */
-    public function sum(string $field): string
-    {
-        return $this->aggregate('SUM', $field);
-    }
-
-    /**
-     * MIN查询
-     * @access public
-     * @param  string $field    字段名
-     * @return string
-     */
-    public function min(string $field): string
-    {
-        return $this->aggregate('MIN', $field);
-    }
-
-    /**
-     * MAX查询
-     * @access public
-     * @param  string $field    字段名
-     * @return string
-     */
-    public function max(string $field): string
-    {
-        return $this->aggregate('MAX', $field);
-    }
-
-    /**
-     * AVG查询
-     * @access public
-     * @param  string $field 字段名
-     * @return string
-     */
-    public function avg(string $field): string
-    {
-        return $this->aggregate('AVG', $field);
-    }
-
-    public function __call($method, $args)
-    {
-        if (strtolower(substr($method, 0, 5)) == 'getby') {
-            // 根据某个字段获取记录
-            $field = Str::snake(substr($method, 5));
-            return $this->where($field, '=', $args[0])->find();
-        } elseif (strtolower(substr($method, 0, 10)) == 'getfieldby') {
-            // 根据某个字段获取记录的某个值
-            $name = Str::snake(substr($method, 10));
-            return $this->where($name, '=', $args[0])->value($args[1]);
+            $this->query->removeOption('field');
         }
 
-        $result = call_user_func_array([$this->query, $method], $args);
-        return $result === $this->query ? $this : $result;
+        return $this->fetch($sql);
+    }
+
+    /**
+     * 聚合查询
+     * @access protected
+     * @param string $aggregate 聚合方法
+     * @param string $field 字段名
+     * @return string
+     */
+    protected function aggregate(string $aggregate, string $field): string
+    {
+        $this->query->parseOptions();
+
+        $field = $aggregate . '(' . $this->builder->parseKey($this->query, $field) . ') AS mftd_' . strtolower($aggregate);
+
+        return $this->value($field, 0, false);
     }
 }

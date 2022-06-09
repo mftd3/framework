@@ -1,12 +1,11 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\console\command;
+namespace mftd\console\command;
 
-use think\console\Command;
-use think\console\Input;
-use think\console\Output;
+use mftd\console\Command;
+use mftd\console\Input;
+use mftd\console\Output;
 
 class Version extends Command
 {
@@ -14,7 +13,7 @@ class Version extends Command
     {
         // 指令配置
         $this->setName('version')
-            ->setDescription('show thinkphp framework version');
+            ->setDescription('show mftdphp framework version');
     }
 
     protected function execute(Input $input, Output $output)

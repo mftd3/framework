@@ -1,8 +1,7 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\event;
+namespace mftd\event;
 
 /**
  * AppInit事件类

@@ -1,32 +1,31 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
-use think\event\AppInit;
-use think\helper\Str;
-use think\initializer\BootService;
-use think\initializer\Error;
-use think\initializer\RegisterService;
+use mftd\event\AppInit;
+use mftd\helper\Str;
+use mftd\initializer\BootService;
+use mftd\initializer\Error;
+use mftd\initializer\RegisterService;
 
 /**
  * App 基础类
- * @property Route      $route
- * @property Config     $config
- * @property Cache      $cache
- * @property Request    $request
- * @property Http       $http
- * @property Console    $console
- * @property Env        $env
- * @property Event      $event
+ * @property Route $route
+ * @property Config $config
+ * @property Cache $cache
+ * @property Request $request
+ * @property Http $http
+ * @property Console $console
+ * @property Env $env
+ * @property Event $event
  * @property Middleware $middleware
- * @property Log        $log
- * @property Lang       $lang
- * @property Db         $db
- * @property Cookie     $cookie
- * @property Session    $session
- * @property Validate   $validate
+ * @property Log $log
+ * @property Lang $lang
+ * @property Db $db
+ * @property Cookie $cookie
+ * @property Session $session
+ * @property Validate $validate
  * @property Filesystem $filesystem
  */
 class App extends Container
@@ -38,67 +37,67 @@ class App extends Container
      * @var bool
      */
     protected $appDebug = false;
-
-    /**
-     * 环境变量标识
-     * @var string
-     */
-    protected $envName = '';
-
-    /**
-     * 应用开始时间
-     * @var float
-     */
-    protected $beginTime;
-
-    /**
-     * 应用内存初始占用
-     * @var integer
-     */
-    protected $beginMem;
-
-    /**
-     * 当前应用类库命名空间
-     * @var string
-     */
-    protected $namespace = 'app';
-
-    /**
-     * 应用根目录
-     * @var string
-     */
-    protected $rootPath = '';
-
-    /**
-     * 框架目录
-     * @var string
-     */
-    protected $thinkPath = '';
-
     /**
      * 应用目录
      * @var string
      */
     protected $appPath = '';
-
     /**
-     * Runtime目录
-     * @var string
+     * 应用内存初始占用
+     * @var integer
      */
-    protected $runtimePath = '';
-
+    protected $beginMem;
     /**
-     * 路由定义目录
-     * @var string
+     * 应用开始时间
+     * @var float
      */
-    protected $routePath = '';
+    protected $beginTime;
+    /**
+     * 容器绑定标识
+     * @var array
+     */
+    protected $bind = [
+        'app' => App::class,
+        'cache' => Cache::class,
+        'config' => Config::class,
+        'console' => Console::class,
+        'cookie' => Cookie::class,
+        'db' => Db::class,
+        'env' => Env::class,
+        'event' => Event::class,
+        'http' => Http::class,
+        'lang' => Lang::class,
+        'log' => Log::class,
+        'middleware' => Middleware::class,
+        'request' => Request::class,
+        'response' => Response::class,
+        'route' => Route::class,
+        'session' => Session::class,
+        'validate' => Validate::class,
+        'view' => View::class,
+        'filesystem' => Filesystem::class,
+        'mftd\DbManager' => Db::class,
+        'mftd\LogManager' => Log::class,
+        'mftd\CacheManager' => Cache::class,
 
+        // 接口依赖注入
+        'Psr\Log\LoggerInterface' => Log::class,
+    ];
     /**
      * 配置后缀
      * @var string
      */
     protected $configExt = '.php';
-
+    /**
+     * 环境变量标识
+     * @var string
+     */
+    protected $envName = '';
+    /**
+     * 初始化
+     * @var bool
+     */
+    protected $initialized = false;
     /**
      * 应用初始化器
      * @var array
@@ -108,50 +107,36 @@ class App extends Container
         RegisterService::class,
         BootService::class,
     ];
-
+    /**
+     * 框架目录
+     * @var string
+     */
+    protected $mftdPath = '';
+    /**
+     * 当前应用类库命名空间
+     * @var string
+     */
+    protected $namespace = 'app';
+    /**
+     * 应用根目录
+     * @var string
+     */
+    protected $rootPath = '';
+    /**
+     * 路由定义目录
+     * @var string
+     */
+    protected $routePath = '';
+    /**
+     * Runtime目录
+     * @var string
+     */
+    protected $runtimePath = '';
     /**
      * 注册的系统服务
      * @var array
      */
     protected $services = [];
-
-    /**
-     * 初始化
-     * @var bool
-     */
-    protected $initialized = false;
-
-    /**
-     * 容器绑定标识
-     * @var array
-     */
-    protected $bind = [
-        'app'                     => App::class,
-        'cache'                   => Cache::class,
-        'config'                  => Config::class,
-        'console'                 => Console::class,
-        'cookie'                  => Cookie::class,
-        'db'                      => Db::class,
-        'env'                     => Env::class,
-        'event'                   => Event::class,
-        'http'                    => Http::class,
-        'lang'                    => Lang::class,
-        'log'                     => Log::class,
-        'middleware'              => Middleware::class,
-        'request'                 => Request::class,
-        'response'                => Response::class,
-        'route'                   => Route::class,
-        'session'                 => Session::class,
-        'validate'                => Validate::class,
-        'view'                    => View::class,
-        'filesystem'              => Filesystem::class,
-        'think\DbManager'         => Db::class,
-        'think\LogManager'        => Log::class,
-        'think\CacheManager'      => Cache::class,
-
-        // 接口依赖注入
-        'Psr\Log\LoggerInterface' => Log::class,
-    ];
 
     /**
      * 架构方法
@@ -160,9 +145,9 @@ class App extends Container
      */
     public function __construct(string $rootPath = '')
     {
-        $this->thinkPath   = realpath(dirname(__DIR__)) . DIRECTORY_SEPARATOR;
-        $this->rootPath    = $rootPath ? rtrim($rootPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : $this->getDefaultRootPath();
-        $this->appPath     = $this->rootPath . 'app' . DIRECTORY_SEPARATOR;
+        $this->mftdPath = realpath(dirname(__DIR__)) . DIRECTORY_SEPARATOR;
+        $this->rootPath = $rootPath ? rtrim($rootPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : $this->getDefaultRootPath();
+        $this->appPath = $this->rootPath . 'app' . DIRECTORY_SEPARATOR;
         $this->runtimePath = $this->rootPath . 'runtime' . DIRECTORY_SEPARATOR;
 
         if (is_file($this->appPath . 'provider.php')) {
@@ -172,37 +157,19 @@ class App extends Container
         static::setInstance($this);
 
         $this->instance('app', $this);
-        $this->instance('think\Container', $this);
+        $this->instance('mftd\Container', $this);
     }
 
     /**
-     * 注册服务
+     * 引导应用
      * @access public
-     * @param Service|string $service 服务
-     * @param bool           $force   强制重新注册
-     * @return Service|null
+     * @return void
      */
-    public function register($service, bool $force = false)
+    public function boot(): void
     {
-        $registered = $this->getService($service);
-
-        if ($registered && !$force) {
-            return $registered;
-        }
-
-        if (is_string($service)) {
-            $service = new $service($this);
-        }
-
-        if (method_exists($service, 'register')) {
-            $service->register();
-        }
-
-        if (property_exists($service, 'bind')) {
-            $this->bind($service->bind);
-        }
-
-        $this->services[] = $service;
+        array_walk($this->services, function ($service) {
+            $this->bootService($service);
+        });
     }
 
     /**
@@ -219,19 +186,6 @@ class App extends Container
     }
 
     /**
-     * 获取服务
-     * @param string|Service $service
-     * @return Service|null
-     */
-    public function getService($service)
-    {
-        $name = is_string($service) ? $service : get_class($service);
-        return array_values(array_filter($this->services, function ($value) use ($name) {
-            return $value instanceof $name;
-        }, ARRAY_FILTER_USE_BOTH))[0] ?? null;
-    }
-
-    /**
      * 开启应用调试模式
      * @access public
      * @param bool $debug 开启应用调试模式
@@ -241,80 +195,6 @@ class App extends Container
     {
         $this->appDebug = $debug;
         return $this;
-    }
-
-    /**
-     * 是否为调试模式
-     * @access public
-     * @return bool
-     */
-    public function isDebug(): bool
-    {
-        return $this->appDebug;
-    }
-
-    /**
-     * 设置应用命名空间
-     * @access public
-     * @param string $namespace 应用命名空间
-     * @return $this
-     */
-    public function setNamespace(string $namespace)
-    {
-        $this->namespace = $namespace;
-        return $this;
-    }
-
-    /**
-     * 获取应用类库命名空间
-     * @access public
-     * @return string
-     */
-    public function getNamespace(): string
-    {
-        return $this->namespace;
-    }
-
-    /**
-     * 设置环境变量标识
-     * @access public
-     * @param string $name 环境标识
-     * @return $this
-     */
-    public function setEnvName(string $name)
-    {
-        $this->envName = $name;
-        return $this;
-    }
-
-    /**
-     * 获取框架版本
-     * @access public
-     * @return string
-     */
-    public function version(): string
-    {
-        return static::VERSION;
-    }
-
-    /**
-     * 获取应用根目录
-     * @access public
-     * @return string
-     */
-    public function getRootPath(): string
-    {
-        return $this->rootPath;
-    }
-
-    /**
-     * 获取应用基础目录
-     * @access public
-     * @return string
-     */
-    public function getBasePath(): string
-    {
-        return $this->rootPath . 'app' . DIRECTORY_SEPARATOR;
     }
 
     /**
@@ -328,71 +208,13 @@ class App extends Container
     }
 
     /**
-     * 设置应用目录
-     * @param string $path 应用目录
-     */
-    public function setAppPath(string $path)
-    {
-        $this->appPath = $path;
-    }
-
-    /**
-     * 获取应用运行时目录
+     * 获取应用基础目录
      * @access public
      * @return string
      */
-    public function getRuntimePath(): string
+    public function getBasePath(): string
     {
-        return $this->runtimePath;
-    }
-
-    /**
-     * 设置runtime目录
-     * @param string $path 定义目录
-     */
-    public function setRuntimePath(string $path): void
-    {
-        $this->runtimePath = $path;
-    }
-
-    /**
-     * 获取核心框架目录
-     * @access public
-     * @return string
-     */
-    public function getThinkPath(): string
-    {
-        return $this->thinkPath;
-    }
-
-    /**
-     * 获取应用配置目录
-     * @access public
-     * @return string
-     */
-    public function getConfigPath(): string
-    {
-        return $this->rootPath . 'config' . DIRECTORY_SEPARATOR;
-    }
-
-    /**
-     * 获取配置后缀
-     * @access public
-     * @return string
-     */
-    public function getConfigExt(): string
-    {
-        return $this->configExt;
-    }
-
-    /**
-     * 获取应用开启时间
-     * @access public
-     * @return float
-     */
-    public function getBeginTime(): float
-    {
-        return $this->beginTime;
+        return $this->rootPath . 'app' . DIRECTORY_SEPARATOR;
     }
 
     /**
@@ -406,19 +228,86 @@ class App extends Container
     }
 
     /**
-     * 加载环境变量定义
+     * 获取应用开启时间
      * @access public
-     * @param string $envName 环境标识
-     * @return void
+     * @return float
      */
-    public function loadEnv(string $envName = ''): void
+    public function getBeginTime(): float
     {
-        // 加载环境变量
-        $envFile = $envName ? $this->rootPath . '.env.' . $envName : $this->rootPath . '.env';
+        return $this->beginTime;
+    }
 
-        if (is_file($envFile)) {
-            $this->env->load($envFile);
-        }
+    /**
+     * 获取配置后缀
+     * @access public
+     * @return string
+     */
+    public function getConfigExt(): string
+    {
+        return $this->configExt;
+    }
+
+    /**
+     * 获取应用配置目录
+     * @access public
+     * @return string
+     */
+    public function getConfigPath(): string
+    {
+        return $this->rootPath . 'config' . DIRECTORY_SEPARATOR;
+    }
+
+    /**
+     * 获取应用类库命名空间
+     * @access public
+     * @return string
+     */
+    public function getNamespace(): string
+    {
+        return $this->namespace;
+    }
+
+    /**
+     * 获取应用根目录
+     * @access public
+     * @return string
+     */
+    public function getRootPath(): string
+    {
+        return $this->rootPath;
+    }
+
+    /**
+     * 获取应用运行时目录
+     * @access public
+     * @return string
+     */
+    public function getRuntimePath(): string
+    {
+        return $this->runtimePath;
+    }
+
+    /**
+     * 获取服务
+     * @param string|Service $service
+     * @return Service|null
+     */
+    public function getService($service)
+    {
+        $name = is_string($service) ? $service : get_class($service);
+        return array_values(array_filter($this->services, function ($value) use ($name) {
+                return $value instanceof $name;
+            }, ARRAY_FILTER_USE_BOTH))[0] ?? null;
+    }
+
+    /**
+     * 获取核心框架目录
+     * @access public
+     * @return string
+     */
+    public function getmftdPath(): string
+    {
+        return $this->mftdPath;
     }
 
     /**
@@ -431,7 +320,7 @@ class App extends Container
         $this->initialized = true;
 
         $this->beginTime = microtime(true);
-        $this->beginMem  = memory_get_usage();
+        $this->beginMem = memory_get_usage();
 
         $this->loadEnv($this->envName);
 
@@ -468,6 +357,53 @@ class App extends Container
     }
 
     /**
+     * 是否为调试模式
+     * @access public
+     * @return bool
+     */
+    public function isDebug(): bool
+    {
+        return $this->appDebug;
+    }
+
+    /**
+     * 加载环境变量定义
+     * @access public
+     * @param string $envName 环境标识
+     * @return void
+     */
+    public function loadEnv(string $envName = ''): void
+    {
+        // 加载环境变量
+        $envFile = $envName ? $this->rootPath . '.env.' . $envName : $this->rootPath . '.env';
+
+        if (is_file($envFile)) {
+            $this->env->load($envFile);
+        }
+    }
+
+    /**
+     * 注册应用事件
+     * @access protected
+     * @param array $event 事件数据
+     * @return void
+     */
+    public function loadEvent(array $event): void
+    {
+        if (isset($event['bind'])) {
+            $this->event->bind($event['bind']);
+        }
+
+        if (isset($event['listen'])) {
+            $this->event->listenEvents($event['listen']);
+        }
+
+        if (isset($event['subscribe'])) {
+            $this->event->subscribe($event['subscribe']);
+        }
+    }
+
+    /**
      * 加载语言包
      * @return void
      */
@@ -479,54 +415,111 @@ class App extends Container
     }
 
     /**
-     * 引导应用
+     * 解析应用类的类名
      * @access public
-     * @return void
+     * @param string $layer 层名 controller model ...
+     * @param string $name 类名
+     * @return string
      */
-    public function boot(): void
+    public function parseClass(string $layer, string $name): string
     {
-        array_walk($this->services, function ($service) {
-            $this->bootService($service);
-        });
+        $name = str_replace(['/', '.'], '\\', $name);
+        $array = explode('\\', $name);
+        $class = Str::studly(array_pop($array));
+        $path = $array ? implode('\\', $array) . '\\' : '';
+
+        return $this->namespace . '\\' . $layer . '\\' . $path . $class;
     }
 
     /**
-     * 加载应用文件和配置
-     * @access protected
-     * @return void
+     * 注册服务
+     * @access public
+     * @param Service|string $service 服务
+     * @param bool $force 强制重新注册
+     * @return Service|null
      */
-    protected function load(): void
+    public function register($service, bool $force = false)
     {
-        $appPath = $this->getAppPath();
+        $registered = $this->getService($service);
 
-        if (is_file($appPath . 'common.php')) {
-            include_once $appPath . 'common.php';
+        if ($registered && !$force) {
+            return $registered;
         }
 
-        include_once $this->thinkPath . 'helper.php';
-
-        $configPath = $this->getConfigPath();
-
-        $files = [];
-
-        if (is_dir($configPath)) {
-            $files = glob($configPath . '*' . $this->configExt);
+        if (is_string($service)) {
+            $service = new $service($this);
         }
 
-        foreach ($files as $file) {
-            $this->config->load($file, pathinfo($file, PATHINFO_FILENAME));
+        if (method_exists($service, 'register')) {
+            $service->register();
         }
 
-        if (is_file($appPath . 'event.php')) {
-            $this->loadEvent(include $appPath . 'event.php');
+        if (property_exists($service, 'bind')) {
+            $this->bind($service->bind);
         }
 
-        if (is_file($appPath . 'service.php')) {
-            $services = include $appPath . 'service.php';
-            foreach ($services as $service) {
-                $this->register($service);
-            }
-        }
+        $this->services[] = $service;
+    }
+
+    /**
+     * 是否运行在命令行下
+     * @return bool
+     */
+    public function runningInConsole(): bool
+    {
+        return php_sapi_name() === 'cli' || php_sapi_name() === 'phpdbg';
+    }
+
+    /**
+     * 设置应用目录
+     * @param string $path 应用目录
+     */
+    public function setAppPath(string $path)
+    {
+        $this->appPath = $path;
+    }
+
+    /**
+     * 设置环境变量标识
+     * @access public
+     * @param string $name 环境标识
+     * @return $this
+     */
+    public function setEnvName(string $name)
+    {
+        $this->envName = $name;
+        return $this;
+    }
+
+    /**
+     * 设置应用命名空间
+     * @access public
+     * @param string $namespace 应用命名空间
+     * @return $this
+     */
+    public function setNamespace(string $namespace)
+    {
+        $this->namespace = $namespace;
+        return $this;
+    }
+
+    /**
+     * 设置runtime目录
+     * @param string $path 定义目录
+     */
+    public function setRuntimePath(string $path): void
+    {
+        $this->runtimePath = $path;
+    }
+
+    /**
+     * 获取框架版本
+     * @access public
+     * @return string
+     */
+    public function version(): string
+    {
+        return static::VERSION;
     }
 
     /**
@@ -555,59 +548,51 @@ class App extends Container
     }
 
     /**
-     * 注册应用事件
-     * @access protected
-     * @param array $event 事件数据
-     * @return void
-     */
-    public function loadEvent(array $event): void
-    {
-        if (isset($event['bind'])) {
-            $this->event->bind($event['bind']);
-        }
-
-        if (isset($event['listen'])) {
-            $this->event->listenEvents($event['listen']);
-        }
-
-        if (isset($event['subscribe'])) {
-            $this->event->subscribe($event['subscribe']);
-        }
-    }
-
-    /**
-     * 解析应用类的类名
-     * @access public
-     * @param string $layer 层名 controller model ...
-     * @param string $name  类名
-     * @return string
-     */
-    public function parseClass(string $layer, string $name): string
-    {
-        $name  = str_replace(['/', '.'], '\\', $name);
-        $array = explode('\\', $name);
-        $class = Str::studly(array_pop($array));
-        $path  = $array ? implode('\\', $array) . '\\' : '';
-
-        return $this->namespace . '\\' . $layer . '\\' . $path . $class;
-    }
-
-    /**
-     * 是否运行在命令行下
-     * @return bool
-     */
-    public function runningInConsole(): bool
-    {
-        return php_sapi_name() === 'cli' || php_sapi_name() === 'phpdbg';
-    }
-
-    /**
      * 获取应用根目录
      * @access protected
      * @return string
      */
     protected function getDefaultRootPath(): string
     {
-        return dirname($this->thinkPath, 4) . DIRECTORY_SEPARATOR;
+        return dirname($this->mftdPath, 4) . DIRECTORY_SEPARATOR;
+    }
+
+    /**
+     * 加载应用文件和配置
+     * @access protected
+     * @return void
+     */
+    protected function load(): void
+    {
+        $appPath = $this->getAppPath();
+
+        if (is_file($appPath . 'common.php')) {
+            include_once $appPath . 'common.php';
+        }
+
+        include_once $this->mftdPath . 'helper.php';
+
+        $configPath = $this->getConfigPath();
+
+        $files = [];
+
+        if (is_dir($configPath)) {
+            $files = glob($configPath . '*' . $this->configExt);
+        }
+
+        foreach ($files as $file) {
+            $this->config->load($file, pathinfo($file, PATHINFO_FILENAME));
+        }
+
+        if (is_file($appPath . 'event.php')) {
+            $this->loadEvent(include $appPath . 'event.php');
+        }
+
+        if (is_file($appPath . 'service.php')) {
+            $services = include $appPath . 'service.php';
+            foreach ($services as $service) {
+                $this->register($service);
+            }
+        }
     }
 }

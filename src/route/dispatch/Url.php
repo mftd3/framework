@@ -1,13 +1,12 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\route\dispatch;
+namespace mftd\route\dispatch;
 
-use think\exception\HttpException;
-use think\helper\Str;
-use think\Request;
-use think\route\Rule;
+use mftd\exception\HttpException;
+use mftd\helper\Str;
+use mftd\Request;
+use mftd\route\Rule;
 
 /**
  * Url Dispatcher
@@ -17,7 +16,7 @@ class Url extends Controller
     public function __construct(Request $request, Rule $rule, $dispatch)
     {
         $this->request = $request;
-        $this->rule    = $rule;
+        $this->rule = $rule;
         // 解析默认的URL规则
         $dispatch = $this->parseUrl($dispatch);
 
@@ -25,9 +24,32 @@ class Url extends Controller
     }
 
     /**
+     * 检查URL是否已经定义过路由
+     * @access protected
+     * @param array $route 路由信息
+     * @return bool
+     */
+    protected function hasDefinedRoute(array $route): bool
+    {
+        [$controller, $action] = $route;
+
+        // 检查地址是否被定义过路由
+        $name = strtolower(Str::studly($controller) . '/' . $action);
+
+        $host = $this->request->host(true);
+        $method = $this->request->method();
+
+        if ($this->rule->getRouter()->getName($name, $host, $method)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * 解析URL地址
      * @access protected
-     * @param  string $url URL
+     * @param string $url URL
      * @return array
      */
     protected function parseUrl(string $url): array
@@ -55,7 +77,7 @@ class Url extends Controller
 
         // 解析操作
         $action = !empty($path) ? array_shift($path) : null;
-        $var    = [];
+        $var = [];
 
         // 解析额外参数
         if ($path) {
@@ -81,28 +103,5 @@ class Url extends Controller
         }
 
         return $route;
-    }
-
-    /**
-     * 检查URL是否已经定义过路由
-     * @access protected
-     * @param  array $route 路由信息
-     * @return bool
-     */
-    protected function hasDefinedRoute(array $route): bool
-    {
-        [$controller, $action] = $route;
-
-        // 检查地址是否被定义过路由
-        $name = strtolower(Str::studly($controller) . '/' . $action);
-
-        $host   = $this->request->host(true);
-        $method = $this->request->method();
-
-        if ($this->rule->getRouter()->getName($name, $host, $method)) {
-            return true;
-        }
-
-        return false;
     }
 }

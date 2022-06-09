@@ -1,37 +1,35 @@
 <?php
 
-namespace think\session\driver;
+namespace mftd\session\driver;
 
+use mftd\contract\SessionHandlerInterface;
+use mftd\helper\Arr;
 use Psr\SimpleCache\CacheInterface;
-use think\contract\SessionHandlerInterface;
-use think\helper\Arr;
 
 class Cache implements SessionHandlerInterface
 {
-    /** @var CacheInterface */
-    protected $handler;
-
     /** @var integer */
     protected $expire;
-
+    /** @var CacheInterface */
+    protected $handler;
     /** @var string */
     protected $prefix;
 
-    public function __construct(\think\Cache $cache, array $config = [])
+    public function __construct(\mftd\Cache $cache, array $config = [])
     {
         $this->handler = $cache->store(Arr::get($config, 'store'));
-        $this->expire  = Arr::get($config, 'expire', 1440);
-        $this->prefix  = Arr::get($config, 'prefix', '');
-    }
-
-    public function read(string $sessionId): string
-    {
-        return (string) $this->handler->get($this->prefix . $sessionId);
+        $this->expire = Arr::get($config, 'expire', 1440);
+        $this->prefix = Arr::get($config, 'prefix', '');
     }
 
     public function delete(string $sessionId): bool
     {
         return $this->handler->delete($this->prefix . $sessionId);
+    }
+
+    public function read(string $sessionId): string
+    {
+        return (string)$this->handler->get($this->prefix . $sessionId);
     }
 
     public function write(string $sessionId, string $data): bool

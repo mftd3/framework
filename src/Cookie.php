@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
 use DateTimeInterface;
 
 /**
  * Cookie管理类
- * @package think
+ * @package mftd
  */
 class Cookie
 {
@@ -18,13 +17,13 @@ class Cookie
      */
     protected $config = [
         // cookie 保存时间
-        'expire'   => 0,
+        'expire' => 0,
         // cookie 保存路径
-        'path'     => '/',
+        'path' => '/',
         // cookie 有效域名
-        'domain'   => '',
+        'domain' => '',
         //  cookie 启用安全传输
-        'secure'   => false,
+        'secure' => false,
         // httponly设置
         'httponly' => false,
         // samesite 设置，支持 'strict' 'lax'
@@ -50,7 +49,7 @@ class Cookie
     public function __construct(Request $request, array $config = [])
     {
         $this->request = $request;
-        $this->config  = array_merge($this->config, array_change_key_case($config));
+        $this->config = array_merge($this->config, array_change_key_case($config));
     }
 
     public static function __make(Request $request, Config $config)
@@ -59,80 +58,24 @@ class Cookie
     }
 
     /**
-     * 获取cookie
+     * Cookie删除
      * @access public
-     * @param  mixed  $name 数据名称
-     * @param  string $default 默认值
-     * @return mixed
-     */
-    public function get(string $name = '', $default = null)
-    {
-        return $this->request->cookie($name, $default);
-    }
-
-    /**
-     * 是否存在Cookie参数
-     * @access public
-     * @param  string $name 变量名
-     * @return bool
-     */
-    public function has(string $name): bool
-    {
-        return $this->request->has($name, 'cookie');
-    }
-
-    /**
-     * Cookie 设置
-     *
-     * @access public
-     * @param  string $name  cookie名称
-     * @param  string $value cookie值
-     * @param  mixed  $option 可选参数
+     * @param string $name cookie名称
+     * @param array $options cookie参数
      * @return void
      */
-    public function set(string $name, string $value, $option = null): void
+    public function delete(string $name, array $options = []): void
     {
-        // 参数设置(会覆盖黙认设置)
-        if (!is_null($option)) {
-            if (is_numeric($option) || $option instanceof DateTimeInterface) {
-                $option = ['expire' => $option];
-            }
-
-            $config = array_merge($this->config, array_change_key_case($option));
-        } else {
-            $config = $this->config;
-        }
-
-        if ($config['expire'] instanceof DateTimeInterface) {
-            $expire = $config['expire']->getTimestamp();
-        } else {
-            $expire = !empty($config['expire']) ? time() + intval($config['expire']) : 0;
-        }
-
-        $this->setCookie($name, $value, $expire, $config);
-    }
-
-    /**
-     * Cookie 保存
-     *
-     * @access public
-     * @param  string $name  cookie名称
-     * @param  string $value cookie值
-     * @param  int    $expire 有效期
-     * @param  array  $option 可选参数
-     * @return void
-     */
-    protected function setCookie(string $name, string $value, int $expire, array $option = []): void
-    {
-        $this->cookie[$name] = [$value, $expire, $option];
+        $config = array_merge($this->config, array_change_key_case($options));
+        $this->setCookie($name, '', time() - 3600, $config);
     }
 
     /**
      * 永久保存Cookie数据
      * @access public
-     * @param  string $name  cookie名称
-     * @param  string $value cookie值
-     * @param  mixed  $option 可选参数 可能会是 null|integer|string
+     * @param string $name cookie名称
+     * @param string $value cookie值
+     * @param mixed $option 可选参数 可能会是 null|integer|string
      * @return void
      */
     public function forever(string $name, string $value = '', $option = null): void
@@ -147,16 +90,15 @@ class Cookie
     }
 
     /**
-     * Cookie删除
+     * 获取cookie
      * @access public
-     * @param  string $name cookie名称
-     * @param  array  $options cookie参数
-     * @return void
+     * @param mixed $name 数据名称
+     * @param string $default 默认值
+     * @return mixed
      */
-    public function delete(string $name, array $options = []): void
+    public function get(string $name = '', $default = null)
     {
-        $config = array_merge($this->config, array_change_key_case($options));
-        $this->setCookie($name, '', time() - 3600, $config);
+        return $this->request->cookie($name, $default);
     }
 
     /**
@@ -167,6 +109,17 @@ class Cookie
     public function getCookie(): array
     {
         return $this->cookie;
+    }
+
+    /**
+     * 是否存在Cookie参数
+     * @access public
+     * @param string $name 变量名
+     * @return bool
+     */
+    public function has(string $name): bool
+    {
+        return $this->request->has($name, 'cookie');
     }
 
     /**
@@ -193,31 +146,77 @@ class Cookie
     }
 
     /**
+     * Cookie 设置
+     *
+     * @access public
+     * @param string $name cookie名称
+     * @param string $value cookie值
+     * @param mixed $option 可选参数
+     * @return void
+     */
+    public function set(string $name, string $value, $option = null): void
+    {
+        // 参数设置(会覆盖黙认设置)
+        if (!is_null($option)) {
+            if (is_numeric($option) || $option instanceof DateTimeInterface) {
+                $option = ['expire' => $option];
+            }
+
+            $config = array_merge($this->config, array_change_key_case($option));
+        } else {
+            $config = $this->config;
+        }
+
+        if ($config['expire'] instanceof DateTimeInterface) {
+            $expire = $config['expire']->getTimestamp();
+        } else {
+            $expire = !empty($config['expire']) ? time() + intval($config['expire']) : 0;
+        }
+
+        $this->setCookie($name, $value, $expire, $config);
+    }
+
+    /**
      * 保存Cookie
      * @access public
-     * @param  string $name cookie名称
-     * @param  string $value cookie值
-     * @param  int    $expire cookie过期时间
-     * @param  string $path 有效的服务器路径
-     * @param  string $domain 有效域名/子域名
-     * @param  bool   $secure 是否仅仅通过HTTPS
-     * @param  bool   $httponly 仅可通过HTTP访问
-     * @param  string $samesite 防止CSRF攻击和用户追踪
+     * @param string $name cookie名称
+     * @param string $value cookie值
+     * @param int $expire cookie过期时间
+     * @param string $path 有效的服务器路径
+     * @param string $domain 有效域名/子域名
+     * @param bool $secure 是否仅仅通过HTTPS
+     * @param bool $httponly 仅可通过HTTP访问
+     * @param string $samesite 防止CSRF攻击和用户追踪
      * @return void
      */
     protected function saveCookie(string $name, string $value, int $expire, string $path, string $domain, bool $secure, bool $httponly, string $samesite): void
     {
         if (version_compare(PHP_VERSION, '7.3.0', '>=')) {
             setcookie($name, $value, [
-                'expires'  => $expire,
-                'path'     => $path,
-                'domain'   => $domain,
-                'secure'   => $secure,
+                'expires' => $expire,
+                'path' => $path,
+                'domain' => $domain,
+                'secure' => $secure,
                 'httponly' => $httponly,
                 'samesite' => $samesite,
             ]);
         } else {
             setcookie($name, $value, $expire, $path, $domain, $secure, $httponly);
         }
+    }
+
+    /**
+     * Cookie 保存
+     *
+     * @access public
+     * @param string $name cookie名称
+     * @param string $value cookie值
+     * @param int $expire 有效期
+     * @param array $option 可选参数
+     * @return void
+     */
+    protected function setCookie(string $name, string $value, int $expire, array $option = []): void
+    {
+        $this->cookie[$name] = [$value, $expire, $option];
     }
 }

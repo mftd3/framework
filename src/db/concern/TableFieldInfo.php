@@ -1,8 +1,7 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\db\concern;
+namespace mftd\db\concern;
 
 /**
  * 数据字段信息
@@ -10,18 +9,29 @@ namespace think\db\concern;
 trait TableFieldInfo
 {
     /**
-     * 获取数据表字段信息
+     * 获取字段类型信息
      * @access public
-     * @param string $tableName 数据表名
-     * @return array
+     * @param string $field 字段名
+     * @return int
      */
-    public function getTableFields($tableName = ''): array
+    public function getFieldBindType(string $field): int
     {
-        if ('' == $tableName) {
-            $tableName = $this->getTable();
-        }
+        $fieldType = $this->getFieldType($field);
 
-        return $this->connection->getTableFields($tableName);
+        return $this->connection->getFieldBindType($fieldType ?: '');
+    }
+
+    /**
+     * 获取字段类型信息
+     * @access public
+     * @param string $field 字段名
+     * @return string|null
+     */
+    public function getFieldType(string $field)
+    {
+        $fieldType = $this->getFieldsType();
+
+        return $fieldType[$field] ?? null;
     }
 
     /**
@@ -40,33 +50,6 @@ trait TableFieldInfo
      * @access public
      * @return array
      */
-    public function getFieldsType(): array
-    {
-        if (!empty($this->options['field_type'])) {
-            return $this->options['field_type'];
-        }
-
-        return $this->connection->getFieldsType($this->getTable());
-    }
-
-    /**
-     * 获取字段类型信息
-     * @access public
-     * @param string $field 字段名
-     * @return string|null
-     */
-    public function getFieldType(string $field)
-    {
-        $fieldType = $this->getFieldsType();
-
-        return $fieldType[$field] ?? null;
-    }
-
-    /**
-     * 获取字段类型信息
-     * @access public
-     * @return array
-     */
     public function getFieldsBindType(): array
     {
         $fieldType = $this->getFieldsType();
@@ -77,13 +60,29 @@ trait TableFieldInfo
     /**
      * 获取字段类型信息
      * @access public
-     * @param string $field 字段名
-     * @return int
+     * @return array
      */
-    public function getFieldBindType(string $field): int
+    public function getFieldsType(): array
     {
-        $fieldType = $this->getFieldType($field);
+        if (!empty($this->options['field_type'])) {
+            return $this->options['field_type'];
+        }
 
-        return $this->connection->getFieldBindType($fieldType ?: '');
+        return $this->connection->getFieldsType($this->getTable());
+    }
+
+    /**
+     * 获取数据表字段信息
+     * @access public
+     * @param string $tableName 数据表名
+     * @return array
+     */
+    public function getTableFields($tableName = ''): array
+    {
+        if ('' == $tableName) {
+            $tableName = $this->getTable();
+        }
+
+        return $this->connection->getTableFields($tableName);
     }
 }

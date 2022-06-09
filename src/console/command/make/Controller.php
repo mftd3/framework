@@ -1,9 +1,9 @@
 <?php
 
-namespace think\console\command\make;
+namespace mftd\console\command\make;
 
-use think\console\command\Make;
-use think\console\input\Option;
+use mftd\console\command\Make;
+use mftd\console\input\Option;
 
 class Controller extends Make
 {
@@ -16,6 +16,16 @@ class Controller extends Make
             ->addOption('api', null, Option::VALUE_NONE, 'Generate an api controller class.')
             ->addOption('plain', null, Option::VALUE_NONE, 'Generate an empty controller class.')
             ->setDescription('Create a new resource controller class');
+    }
+
+    protected function getClassName(string $name): string
+    {
+        return parent::getClassName($name) . ($this->app->config->get('route.controller_suffix') ? 'Controller' : '');
+    }
+
+    protected function getNamespace(string $app): string
+    {
+        return parent::getNamespace($app) . '\\controller';
     }
 
     protected function getStub(): string
@@ -31,15 +41,5 @@ class Controller extends Make
         }
 
         return $stubPath . 'controller.stub';
-    }
-
-    protected function getClassName(string $name): string
-    {
-        return parent::getClassName($name) . ($this->app->config->get('route.controller_suffix') ? 'Controller' : '');
-    }
-
-    protected function getNamespace(string $app): string
-    {
-        return parent::getNamespace($app) . '\\controller';
     }
 }

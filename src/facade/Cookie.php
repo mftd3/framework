@@ -1,15 +1,14 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\facade;
+namespace mftd\facade;
 
-use think\Facade;
+use mftd\Facade;
 
 /**
- * @see \think\Cookie
- * @package think\facade
- * @mixin \think\Cookie
+ * @see \mftd\Cookie
+ * @package mftd\facade
+ * @mixin \mftd\Cookie
  * @method static mixed get(mixed $name = '', string $default = null) 获取cookie
  * @method static bool has(string $name) 是否存在Cookie参数
  * @method static void set(string $name, string $value, mixed $option = null) Cookie 设置

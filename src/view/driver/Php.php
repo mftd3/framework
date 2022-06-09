@@ -1,41 +1,66 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\view\driver;
+namespace mftd\view\driver;
 
+use mftd\App;
+use mftd\contract\TemplateHandlerInterface;
+use mftd\helper\Str;
 use RuntimeException;
-use think\App;
-use think\contract\TemplateHandlerInterface;
-use think\helper\Str;
 
 /**
  * PHP原生模板驱动
  */
 class Php implements TemplateHandlerInterface
 {
-    protected $template;
-    protected $content;
     protected $app;
-
-    // 模板引擎参数
     protected $config = [
         // 默认模板渲染规则 1 解析为小写+下划线 2 全部转换小写 3 保持操作方法
-        'auto_rule'     => 1,
+        'auto_rule' => 1,
         // 视图目录名
         'view_dir_name' => 'view',
         // 应用模板路径
-        'view_path'     => '',
+        'view_path' => '',
         // 模板文件后缀
-        'view_suffix'   => 'php',
+        'view_suffix' => 'php',
         // 模板文件名分隔符
-        'view_depr'     => DIRECTORY_SEPARATOR,
+        'view_depr' => DIRECTORY_SEPARATOR,
     ];
+    protected $content;
+
+    // 模板引擎参数
+    protected $template;
 
     public function __construct(App $app, array $config = [])
     {
-        $this->app    = $app;
-        $this->config = array_merge($this->config, (array) $config);
+        $this->app = $app;
+        $this->config = array_merge($this->config, (array)$config);
+    }
+
+    /**
+     * 配置模板引擎
+     * @access private
+     * @param array $config 参数
+     * @return void
+     */
+    public function config(array $config): void
+    {
+        $this->config = array_merge($this->config, $config);
+    }
+
+    /**
+     * 渲染模板内容
+     * @access public
+     * @param string $content 模板内容
+     * @param array $data 模板变量
+     * @return void
+     */
+    public function display(string $content, array $data = []): void
+    {
+        $this->content = $content;
+
+        extract($data, EXTR_OVERWRITE);
+        eval('?>' . $this->content);
     }
 
     /**
@@ -58,7 +83,7 @@ class Php implements TemplateHandlerInterface
      * 渲染模板文件
      * @access public
      * @param string $template 模板文件
-     * @param array  $data     模板变量
+     * @param array $data 模板变量
      * @return void
      */
     public function fetch(string $template, array $data = []): void
@@ -81,18 +106,14 @@ class Php implements TemplateHandlerInterface
     }
 
     /**
-     * 渲染模板内容
+     * 获取模板引擎配置
      * @access public
-     * @param string $content 模板内容
-     * @param array  $data    模板变量
-     * @return void
+     * @param string $name 参数名
+     * @return mixed
      */
-    public function display(string $content, array $data = []): void
+    public function getConfig(string $name)
     {
-        $this->content = $content;
-
-        extract($data, EXTR_OVERWRITE);
-        eval('?>' . $this->content);
+        return $this->config[$name] ?? null;
     }
 
     /**
@@ -115,7 +136,7 @@ class Php implements TemplateHandlerInterface
             $path = $this->config['view_path'];
         } else {
             $appName = isset($app) ? $app : $this->app->http->getName();
-            $view    = $this->config['view_dir_name'];
+            $view = $this->config['view_dir_name'];
 
             if (is_dir($this->app->getAppPath() . $view)) {
                 $path = isset($app) ? $this->app->getBasePath() . ($appName ? $appName . DIRECTORY_SEPARATOR : '') . $view . DIRECTORY_SEPARATOR : $this->app->getAppPath() . $view . DIRECTORY_SEPARATOR;
@@ -127,10 +148,10 @@ class Php implements TemplateHandlerInterface
         $depr = $this->config['view_depr'];
 
         if (0 !== strpos($template, '/')) {
-            $template   = str_replace(['/', ':'], $depr, $template);
+            $template = str_replace(['/', ':'], $depr, $template);
             $controller = $request->controller();
             if (strpos($controller, '.')) {
-                $pos        = strrpos($controller, '.');
+                $pos = strrpos($controller, '.');
                 $controller = substr($controller, 0, $pos) . '.' . Str::snake(substr($controller, $pos + 1));
             } else {
                 $controller = Str::snake($controller);
@@ -157,27 +178,5 @@ class Php implements TemplateHandlerInterface
         }
 
         return $path . ltrim($template, '/') . '.' . ltrim($this->config['view_suffix'], '.');
-    }
-
-    /**
-     * 配置模板引擎
-     * @access private
-     * @param array $config 参数
-     * @return void
-     */
-    public function config(array $config): void
-    {
-        $this->config = array_merge($this->config, $config);
-    }
-
-    /**
-     * 获取模板引擎配置
-     * @access public
-     * @param string $name 参数名
-     * @return mixed
-     */
-    public function getConfig(string $name)
-    {
-        return $this->config[$name] ?? null;
     }
 }

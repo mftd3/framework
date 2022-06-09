@@ -3,11 +3,11 @@ declare (strict_types = 1);
 
 namespace {%namespace%};
 
-use think\console\Command;
-use think\console\Input;
-use think\console\input\Argument;
-use think\console\input\Option;
-use think\console\Output;
+use mftd\console\Command;
+use mftd\console\Input;
+use mftd\console\input\Argument;
+use mftd\console\input\Option;
+use mftd\console\Output;
 
 class {%className%} extends Command
 {

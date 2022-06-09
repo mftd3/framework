@@ -1,6 +1,6 @@
 <?php
 
-namespace think\contract;
+namespace mftd\contract;
 
 interface Jsonable
 {

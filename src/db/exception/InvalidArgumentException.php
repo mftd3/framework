@@ -1,8 +1,7 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\db\exception;
+namespace mftd\db\exception;
 
 use Psr\SimpleCache\InvalidArgumentException as SimpleCacheInvalidArgumentInterface;
 

@@ -1,30 +1,92 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
-use think\helper\Arr;
+use mftd\helper\Arr;
 
 /**
  * 视图类
- * @package think
+ * @package mftd
  */
 class View extends Manager
 {
-    protected $namespace = '\\think\\view\\driver\\';
-
     /**
      * 模板变量
      * @var array
      */
     protected $data = [];
-
     /**
      * 内容过滤
      * @var mixed
      */
     protected $filter;
+    protected $namespace = '\\mftd\\view\\driver\\';
+
+    /**
+     * 取得模板显示变量的值
+     * @access protected
+     * @param string $name 模板变量
+     * @return mixed
+     */
+    public function __get($name)
+    {
+        return $this->data[$name];
+    }
+
+    /**
+     * 检测模板变量是否设置
+     * @access public
+     * @param string $name 模板变量名
+     * @return bool
+     */
+    public function __isset($name)
+    {
+        return isset($this->data[$name]);
+    }
+
+    /**
+     * 模板变量赋值
+     * @access public
+     * @param string $name 变量名
+     * @param mixed $value 变量值
+     */
+    public function __set($name, $value)
+    {
+        $this->data[$name] = $value;
+    }
+
+    /**
+     * 模板变量赋值
+     * @access public
+     * @param string|array $name 模板变量
+     * @param mixed $value 变量值
+     * @return $this
+     */
+    public function assign($name, $value = null)
+    {
+        if (is_array($name)) {
+            $this->data = array_merge($this->data, $name);
+        } else {
+            $this->data[$name] = $value;
+        }
+
+        return $this;
+    }
+
+    /**
+     * 渲染内容输出
+     * @access public
+     * @param string $content 内容
+     * @param array $vars 模板变量
+     * @return string
+     */
+    public function display(string $content, array $vars = []): string
+    {
+        return $this->getContent(function () use ($vars, $content) {
+            $this->engine()->display($content, array_merge($this->data, $vars));
+        });
+    }
 
     /**
      * 获取模板引擎
@@ -38,21 +100,18 @@ class View extends Manager
     }
 
     /**
-     * 模板变量赋值
+     * 解析和获取模板内容 用于输出
      * @access public
-     * @param string|array $name  模板变量
-     * @param mixed        $value 变量值
-     * @return $this
+     * @param string $template 模板文件名或者内容
+     * @param array $vars 模板变量
+     * @return string
+     * @throws \Exception
      */
-    public function assign($name, $value = null)
+    public function fetch(string $template = '', array $vars = []): string
     {
-        if (is_array($name)) {
-            $this->data = array_merge($this->data, $name);
-        } else {
-            $this->data[$name] = $value;
-        }
-
-        return $this;
+        return $this->getContent(function () use ($vars, $template) {
+            $this->engine()->fetch($template, array_merge($this->data, $vars));
+        });
     }
 
     /**
@@ -68,32 +127,12 @@ class View extends Manager
     }
 
     /**
-     * 解析和获取模板内容 用于输出
-     * @access public
-     * @param string $template 模板文件名或者内容
-     * @param array  $vars     模板变量
-     * @return string
-     * @throws \Exception
+     * 默认驱动
+     * @return string|null
      */
-    public function fetch(string $template = '', array $vars = []): string
+    public function getDefaultDriver()
     {
-        return $this->getContent(function () use ($vars, $template) {
-            $this->engine()->fetch($template, array_merge($this->data, $vars));
-        });
-    }
-
-    /**
-     * 渲染内容输出
-     * @access public
-     * @param string $content 内容
-     * @param array  $vars    模板变量
-     * @return string
-     */
-    public function display(string $content, array $vars = []): string
-    {
-        return $this->getContent(function () use ($vars, $content) {
-            $this->engine()->display($content, array_merge($this->data, $vars));
-        });
+        return $this->app->config->get('view.type', 'php');
     }
 
     /**
@@ -130,52 +169,10 @@ class View extends Manager
         return $content;
     }
 
-    /**
-     * 模板变量赋值
-     * @access public
-     * @param string $name  变量名
-     * @param mixed  $value 变量值
-     */
-    public function __set($name, $value)
-    {
-        $this->data[$name] = $value;
-    }
-
-    /**
-     * 取得模板显示变量的值
-     * @access protected
-     * @param string $name 模板变量
-     * @return mixed
-     */
-    public function __get($name)
-    {
-        return $this->data[$name];
-    }
-
-    /**
-     * 检测模板变量是否设置
-     * @access public
-     * @param string $name 模板变量名
-     * @return bool
-     */
-    public function __isset($name)
-    {
-        return isset($this->data[$name]);
-    }
-
     protected function resolveConfig(string $name)
     {
         $config = $this->app->config->get('view', []);
         Arr::forget($config, 'type');
         return $config;
-    }
-
-    /**
-     * 默认驱动
-     * @return string|null
-     */
-    public function getDefaultDriver()
-    {
-        return $this->app->config->get('view.type', 'php');
     }
 }

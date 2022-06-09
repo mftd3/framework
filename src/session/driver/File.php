@@ -1,16 +1,15 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\session\driver;
+namespace mftd\session\driver;
 
 use Closure;
 use Exception;
 use FilesystemIterator;
 use Generator;
+use mftd\App;
+use mftd\contract\SessionHandlerInterface;
 use SplFileInfo;
-use think\App;
-use think\contract\SessionHandlerInterface;
 
 /**
  * Session 文件驱动
@@ -18,12 +17,12 @@ use think\contract\SessionHandlerInterface;
 class File implements SessionHandlerInterface
 {
     protected $config = [
-        'path'           => '',
-        'expire'         => 1440,
-        'prefix'         => '',
-        'data_compress'  => false,
+        'path' => '',
+        'expire' => 1440,
+        'prefix' => '',
+        'data_compress' => false,
         'gc_probability' => 1,
-        'gc_divisor'     => 100,
+        'gc_divisor' => 100,
     ];
 
     public function __construct(App $app, array $config = [])
@@ -40,21 +39,17 @@ class File implements SessionHandlerInterface
     }
 
     /**
-     * 打开Session
-     * @access protected
-     * @throws Exception
+     * 删除Session
+     * @access public
+     * @param string $sessID
+     * @return bool
      */
-    protected function init(): void
+    public function delete(string $sessID): bool
     {
         try {
-            !is_dir($this->config['path']) && mkdir($this->config['path'], 0755, true);
-        } catch (\Exception $e) {
-            // 写入失败
-        }
-
-        // 垃圾回收
-        if (random_int(1, $this->config['gc_divisor']) <= $this->config['gc_probability']) {
-            $this->gc();
+            return $this->unlink($this->getFileName($sessID));
+        } catch (Exception $e) {
+            return false;
         }
     }
 
@@ -66,7 +61,7 @@ class File implements SessionHandlerInterface
     public function gc(): void
     {
         $lifetime = $this->config['expire'];
-        $now      = time();
+        $now = time();
 
         $files = $this->findFiles($this->config['path'], function (SplFileInfo $item) use ($lifetime, $now) {
             return $now - $lifetime > $item->getMTime();
@@ -78,8 +73,52 @@ class File implements SessionHandlerInterface
     }
 
     /**
+     * 读取Session
+     * @access public
+     * @param string $sessID
+     * @return string
+     */
+    public function read(string $sessID): string
+    {
+        $filename = $this->getFileName($sessID);
+
+        if (is_file($filename) && filemtime($filename) >= time() - $this->config['expire']) {
+            $content = $this->readFile($filename);
+
+            if ($this->config['data_compress'] && function_exists('gzcompress')) {
+                //启用数据压缩
+                $content = (string)gzuncompress($content);
+            }
+
+            return $content;
+        }
+
+        return '';
+    }
+
+    /**
+     * 写入Session
+     * @access public
+     * @param string $sessID
+     * @param string $sessData
+     * @return bool
+     */
+    public function write(string $sessID, string $sessData): bool
+    {
+        $filename = $this->getFileName($sessID, true);
+        $data = $sessData;
+
+        if ($this->config['data_compress'] && function_exists('gzcompress')) {
+            //数据压缩
+            $data = gzcompress($data, 3);
+        }
+
+        return $this->writeFile($filename, $data);
+    }
+
+    /**
      * 查找文件
-     * @param string  $root
+     * @param string $root
      * @param Closure $filter
      * @return Generator
      */
@@ -103,7 +142,7 @@ class File implements SessionHandlerInterface
      * 取得变量的存储文件名
      * @access protected
      * @param string $name 缓存变量名
-     * @param bool   $auto 是否自动创建目录
+     * @param bool $auto 是否自动创建目录
      * @return string
      */
     protected function getFileName(string $name, bool $auto = false): string
@@ -116,12 +155,12 @@ class File implements SessionHandlerInterface
         }
 
         $filename = $this->config['path'] . $name;
-        $dir      = dirname($filename);
+        $dir = dirname($filename);
 
         if ($auto && !is_dir($dir)) {
             try {
                 mkdir($dir, 0755, true);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // 创建失败
             }
         }
@@ -130,38 +169,22 @@ class File implements SessionHandlerInterface
     }
 
     /**
-     * 读取Session
-     * @access public
-     * @param string $sessID
-     * @return string
+     * 打开Session
+     * @access protected
+     * @throws Exception
      */
-    public function read(string $sessID): string
+    protected function init(): void
     {
-        $filename = $this->getFileName($sessID);
-
-        if (is_file($filename) && filemtime($filename) >= time() - $this->config['expire']) {
-            $content = $this->readFile($filename);
-
-            if ($this->config['data_compress'] && function_exists('gzcompress')) {
-                //启用数据压缩
-                $content = (string) gzuncompress($content);
-            }
-
-            return $content;
+        try {
+            !is_dir($this->config['path']) && mkdir($this->config['path'], 0755, true);
+        } catch (Exception $e) {
+            // 写入失败
         }
 
-        return '';
-    }
-
-    /**
-     * 写文件（加锁）
-     * @param $path
-     * @param $content
-     * @return bool
-     */
-    protected function writeFile($path, $content): bool
-    {
-        return (bool) file_put_contents($path, $content, LOCK_EX);
+        // 垃圾回收
+        if (random_int(1, $this->config['gc_divisor']) <= $this->config['gc_probability']) {
+            $this->gc();
+        }
     }
 
     /**
@@ -193,38 +216,14 @@ class File implements SessionHandlerInterface
     }
 
     /**
-     * 写入Session
-     * @access public
-     * @param string $sessID
-     * @param string $sessData
+     * 写文件（加锁）
+     * @param $path
+     * @param $content
      * @return bool
      */
-    public function write(string $sessID, string $sessData): bool
+    protected function writeFile($path, $content): bool
     {
-        $filename = $this->getFileName($sessID, true);
-        $data     = $sessData;
-
-        if ($this->config['data_compress'] && function_exists('gzcompress')) {
-            //数据压缩
-            $data = gzcompress($data, 3);
-        }
-
-        return $this->writeFile($filename, $data);
-    }
-
-    /**
-     * 删除Session
-     * @access public
-     * @param string $sessID
-     * @return bool
-     */
-    public function delete(string $sessID): bool
-    {
-        try {
-            return $this->unlink($this->getFileName($sessID));
-        } catch (\Exception $e) {
-            return false;
-        }
+        return (bool)file_put_contents($path, $content, LOCK_EX);
     }
 
     /**

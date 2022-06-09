@@ -1,8 +1,9 @@
 <?php
 
-namespace think\console\output\driver;
+namespace mftd\console\output\driver;
 
-use think\console\Output;
+use mftd\console\Output;
+use Throwable;
 
 class Buffer
 {
@@ -18,14 +19,19 @@ class Buffer
 
     public function fetch()
     {
-        $content      = $this->buffer;
+        $content = $this->buffer;
         $this->buffer = '';
         return $content;
     }
 
+    public function renderException(Throwable $e)
+    {
+        // do nothing
+    }
+
     public function write($messages, bool $newline = false, int $options = 0)
     {
-        $messages = (array) $messages;
+        $messages = (array)$messages;
 
         foreach ($messages as $message) {
             $this->buffer .= $message;
@@ -33,10 +39,5 @@ class Buffer
         if ($newline) {
             $this->buffer .= "\n";
         }
-    }
-
-    public function renderException(\Throwable $e)
-    {
-        // do nothing
     }
 }

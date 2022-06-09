@@ -1,8 +1,8 @@
 <?php
 
-namespace think\console\command\make;
+namespace mftd\console\command\make;
 
-use think\console\command\Make;
+use mftd\console\command\Make;
 
 class Validate extends Make
 {
@@ -15,15 +15,15 @@ class Validate extends Make
             ->setDescription('Create a validate class');
     }
 
+    protected function getNamespace(string $app): string
+    {
+        return parent::getNamespace($app) . '\\validate';
+    }
+
     protected function getStub(): string
     {
         $stubPath = __DIR__ . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR;
 
         return $stubPath . 'validate.stub';
-    }
-
-    protected function getNamespace(string $app): string
-    {
-        return parent::getNamespace($app) . '\\validate';
     }
 }

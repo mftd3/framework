@@ -1,8 +1,9 @@
 <?php
 
-namespace think\console\output\driver;
+namespace mftd\console\output\driver;
 
-use think\console\Output;
+use mftd\console\Output;
+use Throwable;
 
 class Nothing
 {
@@ -11,12 +12,12 @@ class Nothing
         // do nothing
     }
 
-    public function write($messages, bool $newline = false, int $options = 0)
+    public function renderException(Throwable $e)
     {
         // do nothing
     }
 
-    public function renderException(\Throwable $e)
+    public function write($messages, bool $newline = false, int $options = 0)
     {
         // do nothing
     }

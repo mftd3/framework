@@ -1,8 +1,7 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\event;
+namespace mftd\event;
 
 /**
  * LogWrite事件类
@@ -18,6 +17,6 @@ class LogWrite
     public function __construct($channel, $log)
     {
         $this->channel = $channel;
-        $this->log     = $log;
+        $this->log = $log;
     }
 }

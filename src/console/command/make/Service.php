@@ -1,8 +1,8 @@
 <?php
 
-namespace think\console\command\make;
+namespace mftd\console\command\make;
 
-use think\console\command\Make;
+use mftd\console\command\Make;
 
 class Service extends Make
 {
@@ -15,13 +15,13 @@ class Service extends Make
             ->setDescription('Create a new Service class');
     }
 
-    protected function getStub(): string
-    {
-        return __DIR__ . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'service.stub';
-    }
-
     protected function getNamespace(string $app): string
     {
         return parent::getNamespace($app) . '\\service';
+    }
+
+    protected function getStub(): string
+    {
+        return __DIR__ . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'service.stub';
     }
 }

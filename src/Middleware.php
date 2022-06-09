@@ -1,32 +1,30 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
 use Closure;
 use InvalidArgumentException;
 use LogicException;
-use think\exception\Handle;
+use mftd\exception\Handle;
 use Throwable;
 
 /**
  * 中间件管理类
- * @package think
+ * @package mftd
  */
 class Middleware
 {
-    /**
-     * 中间件执行队列
-     * @var array
-     */
-    protected $queue = [];
-
     /**
      * 应用对象
      * @var App
      */
     protected $app;
+    /**
+     * 中间件执行队列
+     * @var array
+     */
+    protected $queue = [];
 
     public function __construct(App $app)
     {
@@ -34,23 +32,9 @@ class Middleware
     }
 
     /**
-     * 导入中间件
-     * @access public
-     * @param array  $middlewares
-     * @param string $type 中间件类型
-     * @return void
-     */
-    public function import(array $middlewares = [], string $type = 'global'): void
-    {
-        foreach ($middlewares as $middleware) {
-            $this->add($middleware, $type);
-        }
-    }
-
-    /**
      * 注册中间件
      * @access public
-     * @param mixed  $middleware
+     * @param mixed $middleware
      * @param string $type 中间件类型
      * @return void
      */
@@ -60,19 +44,19 @@ class Middleware
 
         if (!empty($middleware)) {
             $this->queue[$type][] = $middleware;
-            $this->queue[$type]   = array_unique($this->queue[$type], SORT_REGULAR);
+            $this->queue[$type] = array_unique($this->queue[$type], SORT_REGULAR);
         }
     }
 
     /**
-     * 注册路由中间件
+     * 获取注册的中间件
      * @access public
-     * @param mixed $middleware
-     * @return void
+     * @param string $type 中间件类型
+     * @return array
      */
-    public function route($middleware): void
+    public function all(string $type = 'global'): array
     {
-        $this->add($middleware, 'route');
+        return $this->queue[$type] ?? [];
     }
 
     /**
@@ -87,33 +71,52 @@ class Middleware
     }
 
     /**
-     * 注册中间件到开始位置
-     * @access public
-     * @param mixed  $middleware
-     * @param string $type 中间件类型
+     * 结束调度
+     * @param Response $response
      */
-    public function unshift($middleware, string $type = 'global')
+    public function end(Response $response)
     {
-        $middleware = $this->buildMiddleware($middleware, $type);
-
-        if (!empty($middleware)) {
-            if (!isset($this->queue[$type])) {
-                $this->queue[$type] = [];
+        foreach ($this->queue as $queue) {
+            foreach ($queue as $middleware) {
+                [$call] = $middleware;
+                if (is_array($call) && is_string($call[0])) {
+                    $instance = $this->app->make($call[0]);
+                    if (method_exists($instance, 'end')) {
+                        $instance->end($response);
+                    }
+                }
             }
-
-            array_unshift($this->queue[$type], $middleware);
         }
     }
 
     /**
-     * 获取注册的中间件
-     * @access public
-     * @param string $type 中间件类型
-     * @return array
+     * 异常处理
+     * @param Request $passable
+     * @param Throwable $e
+     * @return Response
      */
-    public function all(string $type = 'global'): array
+    public function handleException($passable, Throwable $e)
     {
-        return $this->queue[$type] ?? [];
+        /** @var Handle $handler */
+        $handler = $this->app->make(Handle::class);
+
+        $handler->report($e);
+
+        return $handler->render($passable, $e);
+    }
+
+    /**
+     * 导入中间件
+     * @access public
+     * @param array $middlewares
+     * @param string $type 中间件类型
+     * @return void
+     */
+    public function import(array $middlewares = [], string $type = 'global'): void
+    {
+        foreach ($middlewares as $middleware) {
+            $this->add($middleware, $type);
+        }
     }
 
     /**
@@ -143,44 +146,39 @@ class Middleware
     }
 
     /**
-     * 结束调度
-     * @param Response $response
+     * 注册路由中间件
+     * @access public
+     * @param mixed $middleware
+     * @return void
      */
-    public function end(Response $response)
+    public function route($middleware): void
     {
-        foreach ($this->queue as $queue) {
-            foreach ($queue as $middleware) {
-                [$call] = $middleware;
-                if (is_array($call) && is_string($call[0])) {
-                    $instance = $this->app->make($call[0]);
-                    if (method_exists($instance, 'end')) {
-                        $instance->end($response);
-                    }
-                }
-            }
-        }
+        $this->add($middleware, 'route');
     }
 
     /**
-     * 异常处理
-     * @param Request   $passable
-     * @param Throwable $e
-     * @return Response
+     * 注册中间件到开始位置
+     * @access public
+     * @param mixed $middleware
+     * @param string $type 中间件类型
      */
-    public function handleException($passable, Throwable $e)
+    public function unshift($middleware, string $type = 'global')
     {
-        /** @var Handle $handler */
-        $handler = $this->app->make(Handle::class);
+        $middleware = $this->buildMiddleware($middleware, $type);
 
-        $handler->report($e);
+        if (!empty($middleware)) {
+            if (!isset($this->queue[$type])) {
+                $this->queue[$type] = [];
+            }
 
-        return $handler->render($passable, $e);
+            array_unshift($this->queue[$type], $middleware);
+        }
     }
 
     /**
      * 解析中间件
      * @access protected
-     * @param mixed  $middleware
+     * @param mixed $middleware
      * @param string $type 中间件类型
      * @return array
      */
@@ -214,6 +212,22 @@ class Middleware
     }
 
     /**
+     * 获取中间件优先级
+     * @param $priority
+     * @param $middleware
+     * @return int
+     */
+    protected function getMiddlewarePriority($priority, $middleware)
+    {
+        [$call] = $middleware;
+        if (is_array($call) && is_string($call[0])) {
+            $index = array_search($call[0], array_reverse($priority));
+            return false === $index ? -1 : $index;
+        }
+        return -1;
+    }
+
+    /**
      * 中间件排序
      * @param array $middlewares
      * @return array
@@ -228,21 +242,5 @@ class Middleware
         });
 
         return $middlewares;
-    }
-
-    /**
-     * 获取中间件优先级
-     * @param $priority
-     * @param $middleware
-     * @return int
-     */
-    protected function getMiddlewarePriority($priority, $middleware)
-    {
-        [$call] = $middleware;
-        if (is_array($call) && is_string($call[0])) {
-            $index = array_search($call[0], array_reverse($priority));
-            return false === $index ? -1 : $index;
-        }
-        return -1;
     }
 }

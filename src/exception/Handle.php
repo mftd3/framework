@@ -1,16 +1,15 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\exception;
+namespace mftd\exception;
 
 use Exception;
-use think\App;
-use think\console\Output;
-use think\db\exception\DataNotFoundException;
-use think\db\exception\ModelNotFoundException;
-use think\Request;
-use think\Response;
+use mftd\App;
+use mftd\console\Output;
+use mftd\db\exception\DataNotFoundException;
+use mftd\db\exception\ModelNotFoundException;
+use mftd\Request;
+use mftd\Response;
 use Throwable;
 
 /**
@@ -37,59 +36,10 @@ class Handle
     }
 
     /**
-     * Report or log an exception.
-     *
-     * @access public
-     * @param Throwable $exception
-     * @return void
-     */
-    public function report(Throwable $exception): void
-    {
-        if (!$this->isIgnoreReport($exception)) {
-            // 收集异常数据
-            if ($this->app->isDebug()) {
-                $data = [
-                    'file'    => $exception->getFile(),
-                    'line'    => $exception->getLine(),
-                    'message' => $this->getMessage($exception),
-                    'code'    => $this->getCode($exception),
-                ];
-                $log = "[{$data['code']}]{$data['message']}[{$data['file']}:{$data['line']}]";
-            } else {
-                $data = [
-                    'code'    => $this->getCode($exception),
-                    'message' => $this->getMessage($exception),
-                ];
-                $log = "[{$data['code']}]{$data['message']}";
-            }
-
-            if ($this->app->config->get('log.record_trace')) {
-                $log .= PHP_EOL . $exception->getTraceAsString();
-            }
-
-            try {
-                $this->app->log->record($log, 'error');
-            } catch (Exception $e) {
-            }
-        }
-    }
-
-    protected function isIgnoreReport(Throwable $exception): bool
-    {
-        foreach ($this->ignoreReport as $class) {
-            if ($exception instanceof $class) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Render an exception into an HTTP response.
      *
      * @access public
-     * @param Request   $request
+     * @param Request $request
      * @param Throwable $e
      * @return Response
      */
@@ -107,7 +57,7 @@ class Handle
 
     /**
      * @access public
-     * @param Output    $output
+     * @param Output $output
      * @param Throwable $e
      */
     public function renderForConsole(Output $output, Throwable $e): void
@@ -120,19 +70,40 @@ class Handle
     }
 
     /**
-     * @access protected
-     * @param HttpException $e
-     * @return Response
+     * Report or log an exception.
+     *
+     * @access public
+     * @param Throwable $exception
+     * @return void
      */
-    protected function renderHttpException(HttpException $e): Response
+    public function report(Throwable $exception): void
     {
-        $status   = $e->getStatusCode();
-        $template = $this->app->config->get('app.http_exception_template');
+        if (!$this->isIgnoreReport($exception)) {
+            // 收集异常数据
+            if ($this->app->isDebug()) {
+                $data = [
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                    'message' => $this->getMessage($exception),
+                    'code' => $this->getCode($exception),
+                ];
+                $log = "[{$data['code']}]{$data['message']}[{$data['file']}:{$data['line']}]";
+            } else {
+                $data = [
+                    'code' => $this->getCode($exception),
+                    'message' => $this->getMessage($exception),
+                ];
+                $log = "[{$data['code']}]{$data['message']}";
+            }
 
-        if (!$this->app->isDebug() && !empty($template[$status])) {
-            return Response::create($template[$status], 'view', $status)->assign(['e' => $e]);
-        } else {
-            return $this->convertExceptionToResponse($e);
+            if ($this->app->config->get('log.record_trace')) {
+                $log .= PHP_EOL . $exception->getTraceAsString();
+            }
+
+            try {
+                $this->app->log->record($log, 'error');
+            } catch (Exception $e) {
+            }
         }
     }
 
@@ -145,37 +116,37 @@ class Handle
     {
         if ($this->app->isDebug()) {
             // 调试模式，获取详细的错误信息
-            $traces        = [];
+            $traces = [];
             $nextException = $exception;
             do {
                 $traces[] = [
-                    'name'    => get_class($nextException),
-                    'file'    => $nextException->getFile(),
-                    'line'    => $nextException->getLine(),
-                    'code'    => $this->getCode($nextException),
+                    'name' => get_class($nextException),
+                    'file' => $nextException->getFile(),
+                    'line' => $nextException->getLine(),
+                    'code' => $this->getCode($nextException),
                     'message' => $this->getMessage($nextException),
-                    'trace'   => $nextException->getTrace(),
-                    'source'  => $this->getSourceCode($nextException),
+                    'trace' => $nextException->getTrace(),
+                    'source' => $this->getSourceCode($nextException),
                 ];
             } while ($nextException = $nextException->getPrevious());
             $data = [
-                'code'    => $this->getCode($exception),
+                'code' => $this->getCode($exception),
                 'message' => $this->getMessage($exception),
-                'traces'  => $traces,
-                'datas'   => $this->getExtendData($exception),
-                'tables'  => [
-                    'GET Data'            => $this->app->request->get(),
-                    'POST Data'           => $this->app->request->post(),
-                    'Files'               => $this->app->request->file(),
-                    'Cookies'             => $this->app->request->cookie(),
-                    'Session'             => $this->app->exists('session') ? $this->app->session->all() : [],
+                'traces' => $traces,
+                'datas' => $this->getExtendData($exception),
+                'tables' => [
+                    'GET Data' => $this->app->request->get(),
+                    'POST Data' => $this->app->request->post(),
+                    'Files' => $this->app->request->file(),
+                    'Cookies' => $this->app->request->cookie(),
+                    'Session' => $this->app->exists('session') ? $this->app->session->all() : [],
                     'Server/Request Data' => $this->app->request->server(),
                 ],
             ];
         } else {
             // 部署模式仅显示 Code 和 Message
             $data = [
-                'code'    => $this->getCode($exception),
+                'code' => $this->getCode($exception),
                 'message' => $this->getMessage($exception),
             ];
 
@@ -209,16 +180,6 @@ class Handle
         return $response->code($statusCode ?? 500);
     }
 
-    protected function renderExceptionContent(Throwable $exception): string
-    {
-        ob_start();
-        $data = $this->convertExceptionToArray($exception);
-        extract($data);
-        include $this->app->config->get('app.exception_tmpl') ?: __DIR__ . '/../../tpl/think_exception.tpl';
-
-        return ob_get_clean();
-    }
-
     /**
      * 获取错误编码
      * ErrorException则使用错误级别作为错误编码
@@ -235,6 +196,36 @@ class Handle
         }
 
         return $code;
+    }
+
+    /**
+     * 获取常量列表
+     * @access protected
+     * @return array 常量列表
+     */
+    protected function getConst(): array
+    {
+        $const = get_defined_constants(true);
+
+        return $const['user'] ?? [];
+    }
+
+    /**
+     * 获取异常扩展信息
+     * 用于非调试模式html返回类型显示
+     * @access protected
+     * @param Throwable $exception
+     * @return array                 异常类定义的扩展数据
+     */
+    protected function getExtendData(Throwable $exception): array
+    {
+        $data = [];
+
+        if ($exception instanceof \mftd\Exception) {
+            $data = $exception->getData();
+        }
+
+        return $data;
     }
 
     /**
@@ -255,10 +246,10 @@ class Handle
         $lang = $this->app->lang;
 
         if (strpos($message, ':')) {
-            $name    = strstr($message, ':', true);
+            $name = strstr($message, ':', true);
             $message = $lang->has($name) ? $lang->get($name) . strstr($message, ':') : $message;
         } elseif (strpos($message, ',')) {
-            $name    = strstr($message, ',', true);
+            $name = strstr($message, ',', true);
             $message = $lang->has($name) ? $lang->get($name) . ':' . substr(strstr($message, ','), 1) : $message;
         } elseif ($lang->has($message)) {
             $message = $lang->get($message);
@@ -277,13 +268,13 @@ class Handle
     protected function getSourceCode(Throwable $exception): array
     {
         // 读取前9行和后9行
-        $line  = $exception->getLine();
+        $line = $exception->getLine();
         $first = ($line - 9 > 0) ? $line - 9 : 1;
 
         try {
             $contents = file($exception->getFile()) ?: [];
-            $source   = [
-                'first'  => $first,
+            $source = [
+                'first' => $first,
                 'source' => array_slice($contents, $first - 1, 19),
             ];
         } catch (Exception $e) {
@@ -293,33 +284,41 @@ class Handle
         return $source;
     }
 
-    /**
-     * 获取异常扩展信息
-     * 用于非调试模式html返回类型显示
-     * @access protected
-     * @param Throwable $exception
-     * @return array                 异常类定义的扩展数据
-     */
-    protected function getExtendData(Throwable $exception): array
+    protected function isIgnoreReport(Throwable $exception): bool
     {
-        $data = [];
-
-        if ($exception instanceof \think\Exception) {
-            $data = $exception->getData();
+        foreach ($this->ignoreReport as $class) {
+            if ($exception instanceof $class) {
+                return true;
+            }
         }
 
-        return $data;
+        return false;
+    }
+
+    protected function renderExceptionContent(Throwable $exception): string
+    {
+        ob_start();
+        $data = $this->convertExceptionToArray($exception);
+        extract($data);
+        include $this->app->config->get('app.exception_tmpl') ?: __DIR__ . '/../../tpl/mftd_exception.tpl';
+
+        return ob_get_clean();
     }
 
     /**
-     * 获取常量列表
      * @access protected
-     * @return array 常量列表
+     * @param HttpException $e
+     * @return Response
      */
-    protected function getConst(): array
+    protected function renderHttpException(HttpException $e): Response
     {
-        $const = get_defined_constants(true);
+        $status = $e->getStatusCode();
+        $template = $this->app->config->get('app.http_exception_template');
 
-        return $const['user'] ?? [];
+        if (!$this->app->isDebug() && !empty($template[$status])) {
+            return Response::create($template[$status], 'view', $status)->assign(['e' => $e]);
+        } else {
+            return $this->convertExceptionToResponse($e);
+        }
     }
 }

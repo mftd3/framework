@@ -1,24 +1,23 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\log;
+namespace mftd\log;
 
-use think\Log;
+use mftd\Log;
 
 /**
  * Class ChannelSet
- * @package think\log
+ * @package mftd\log
  * @mixin Channel
  */
 class ChannelSet
 {
-    protected $log;
     protected $channels;
+    protected $log;
 
     public function __construct(Log $log, array $channels)
     {
-        $this->log      = $log;
+        $this->log = $log;
         $this->channels = $channels;
     }
 

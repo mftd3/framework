@@ -1,14 +1,15 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\model\concern;
+namespace mftd\model\concern;
 
+use Closure;
+use Exception;
 use InvalidArgumentException;
-use think\db\Raw;
-use think\helper\Str;
-use think\Model;
-use think\model\Relation;
+use mftd\db\Raw;
+use mftd\helper\Str;
+use mftd\model\Relation;
+use stdClass;
 
 /**
  * 模型数据处理
@@ -16,83 +17,70 @@ use think\model\Relation;
 trait Attribute
 {
     /**
-     * 数据表主键 复合主键使用数组定义
-     * @var string|array
-     */
-    protected $pk = 'id';
-
-    /**
-     * 数据表字段信息 留空则自动获取
+     * 数据表废弃字段
      * @var array
      */
-    protected $schema = [];
-
+    protected $disuse = [];
     /**
      * 当前允许写入的字段
      * @var array
      */
     protected $field = [];
-
-    /**
-     * 字段自动类型转换
-     * @var array
-     */
-    protected $type = [];
-
-    /**
-     * 数据表废弃字段
-     * @var array
-     */
-    protected $disuse = [];
-
-    /**
-     * 数据表只读字段
-     * @var array
-     */
-    protected $readonly = [];
-
-    /**
-     * 当前模型数据
-     * @var array
-     */
-    private $data = [];
-
-    /**
-     * 原始数据
-     * @var array
-     */
-    private $origin = [];
-
     /**
      * JSON数据表字段
      * @var array
      */
     protected $json = [];
-
-    /**
-     * JSON数据表字段类型
-     * @var array
-     */
-    protected $jsonType = [];
-
     /**
      * JSON数据取出是否需要转换为数组
      * @var bool
      */
     protected $jsonAssoc = false;
-
+    /**
+     * JSON数据表字段类型
+     * @var array
+     */
+    protected $jsonType = [];
+    /**
+     * 数据表主键 复合主键使用数组定义
+     * @var string|array
+     */
+    protected $pk = 'id';
+    /**
+     * 数据表只读字段
+     * @var array
+     */
+    protected $readonly = [];
+    /**
+     * 数据表字段信息 留空则自动获取
+     * @var array
+     */
+    protected $schema = [];
     /**
      * 是否严格字段大小写
      * @var bool
      */
     protected $strict = true;
-
+    /**
+     * 字段自动类型转换
+     * @var array
+     */
+    protected $type = [];
+    /**
+     * 当前模型数据
+     * @var array
+     */
+    private $data = [];
     /**
      * 获取器数据
      * @var array
      */
     private $get = [];
-
+    /**
+     * 原始数据
+     * @var array
+     */
+    private $origin = [];
     /**
      * 动态获取器
      * @var array
@@ -100,54 +88,9 @@ trait Attribute
     private $withAttr = [];
 
     /**
-     * 获取模型对象的主键
-     * @access public
-     * @return string|array
-     */
-    public function getPk()
-    {
-        return $this->pk;
-    }
-
-    /**
-     * 判断一个字段名是否为主键字段
-     * @access public
-     * @param  string $key 名称
-     * @return bool
-     */
-    protected function isPk(string $key): bool
-    {
-        $pk = $this->getPk();
-
-        if (is_string($pk) && $pk == $key) {
-            return true;
-        } elseif (is_array($pk) && in_array($key, $pk)) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * 获取模型对象的主键值
-     * @access public
-     * @return mixed
-     */
-    public function getKey()
-    {
-        $pk = $this->getPk();
-
-        if (is_string($pk) && array_key_exists($pk, $this->data)) {
-            return $this->data[$pk];
-        }
-
-        return;
-    }
-
-    /**
      * 设置允许写入的字段
      * @access public
-     * @param  array $field 允许写入的字段
+     * @param array $field 允许写入的字段
      * @return $this
      */
     public function allowField(array $field)
@@ -158,39 +101,29 @@ trait Attribute
     }
 
     /**
-     * 设置只读字段
+     * 批量追加数据对象值
      * @access public
-     * @param  array $field 只读字段
+     * @param array $data 数据
+     * @param bool $set 是否需要进行数据处理
      * @return $this
      */
-    public function readOnly(array $field)
+    public function appendData(array $data, bool $set = false)
     {
-        $this->readonly = $field;
+        if ($set) {
+            $this->setAttrs($data);
+        } else {
+            $this->data = array_merge($this->data, $data);
+        }
 
         return $this;
     }
 
     /**
-     * 获取实际的字段名
-     * @access protected
-     * @param  string $name 字段名
-     * @return string
-     */
-    protected function getRealFieldName(string $name): string
-    {
-        if ($this->convertNameToCamel || !$this->strict) {
-            return Str::snake($name);
-        }
-
-        return $name;
-    }
-
-    /**
      * 设置数据对象值
      * @access public
-     * @param  array    $data  数据
-     * @param  bool     $set   是否调用修改器
-     * @param  array    $allow 允许的字段名
+     * @param array $data 数据
+     * @param bool $set 是否调用修改器
+     * @param array $allow 允许的字段名
      * @return $this
      */
     public function data(array $data, bool $set = false, array $allow = [])
@@ -226,73 +159,23 @@ trait Attribute
     }
 
     /**
-     * 批量追加数据对象值
+     * 获取器 获取数据对象的值
      * @access public
-     * @param  array $data  数据
-     * @param  bool  $set   是否需要进行数据处理
-     * @return $this
-     */
-    public function appendData(array $data, bool $set = false)
-    {
-        if ($set) {
-            $this->setAttrs($data);
-        } else {
-            $this->data = array_merge($this->data, $data);
-        }
-
-        return $this;
-    }
-
-    /**
-     * 刷新对象原始数据（为当前数据）
-     * @access public
-     * @return $this
-     */
-    public function refreshOrigin()
-    {
-        $this->origin = $this->data;
-        return $this;
-    }
-
-    /**
-     * 获取对象原始数据 如果不存在指定字段返回null
-     * @access public
-     * @param  string $name 字段名 留空获取全部
-     * @return mixed
-     */
-    public function getOrigin(string $name = null)
-    {
-        if (is_null($name)) {
-            return $this->origin;
-        }
-
-        $fieldName = $this->getRealFieldName($name);
-
-        return array_key_exists($fieldName, $this->origin) ? $this->origin[$fieldName] : null;
-    }
-
-    /**
-     * 获取当前对象数据 如果不存在指定字段返回false
-     * @access public
-     * @param  string $name 字段名 留空获取全部
+     * @param string $name 名称
      * @return mixed
      * @throws InvalidArgumentException
      */
-    public function getData(string $name = null)
+    public function getAttr(string $name)
     {
-        if (is_null($name)) {
-            return $this->data;
+        try {
+            $relation = false;
+            $value = $this->getData($name);
+        } catch (InvalidArgumentException $e) {
+            $relation = $this->isRelationAttr($name);
+            $value = null;
         }
 
-        $fieldName = $this->getRealFieldName($name);
-
-        if (array_key_exists($fieldName, $this->data)) {
-            return $this->data[$fieldName];
-        } elseif (array_key_exists($fieldName, $this->relation)) {
-            return $this->relation[$fieldName];
-        }
-
-        throw new InvalidArgumentException('property not exists:' . static::class . '->' . $name);
+        return $this->getValue($name, $value, $relation);
     }
 
     /**
@@ -321,10 +204,101 @@ trait Attribute
     }
 
     /**
+     * 获取当前对象数据 如果不存在指定字段返回false
+     * @access public
+     * @param string $name 字段名 留空获取全部
+     * @return mixed
+     * @throws InvalidArgumentException
+     */
+    public function getData(string $name = null)
+    {
+        if (is_null($name)) {
+            return $this->data;
+        }
+
+        $fieldName = $this->getRealFieldName($name);
+
+        if (array_key_exists($fieldName, $this->data)) {
+            return $this->data[$fieldName];
+        } elseif (array_key_exists($fieldName, $this->relation)) {
+            return $this->relation[$fieldName];
+        }
+
+        throw new InvalidArgumentException('property not exists:' . static::class . '->' . $name);
+    }
+
+    /**
+     * 获取模型对象的主键值
+     * @access public
+     * @return mixed
+     */
+    public function getKey()
+    {
+        $pk = $this->getPk();
+
+        if (is_string($pk) && array_key_exists($pk, $this->data)) {
+            return $this->data[$pk];
+        }
+
+        return;
+    }
+
+    /**
+     * 获取对象原始数据 如果不存在指定字段返回null
+     * @access public
+     * @param string $name 字段名 留空获取全部
+     * @return mixed
+     */
+    public function getOrigin(string $name = null)
+    {
+        if (is_null($name)) {
+            return $this->origin;
+        }
+
+        $fieldName = $this->getRealFieldName($name);
+
+        return array_key_exists($fieldName, $this->origin) ? $this->origin[$fieldName] : null;
+    }
+
+    /**
+     * 获取模型对象的主键
+     * @access public
+     * @return string|array
+     */
+    public function getPk()
+    {
+        return $this->pk;
+    }
+
+    /**
+     * 设置只读字段
+     * @access public
+     * @param array $field 只读字段
+     * @return $this
+     */
+    public function readOnly(array $field)
+    {
+        $this->readonly = $field;
+
+        return $this;
+    }
+
+    /**
+     * 刷新对象原始数据（为当前数据）
+     * @access public
+     * @return $this
+     */
+    public function refreshOrigin()
+    {
+        $this->origin = $this->data;
+        return $this;
+    }
+
+    /**
      * 直接设置数据对象值
      * @access public
-     * @param  string $name  属性名
-     * @param  mixed  $value 值
+     * @param string $name 属性名
+     * @param mixed $value 值
      * @return void
      */
     public function set(string $name, $value): void
@@ -336,25 +310,11 @@ trait Attribute
     }
 
     /**
-     * 通过修改器 批量设置数据对象值
-     * @access public
-     * @param  array $data  数据
-     * @return void
-     */
-    public function setAttrs(array $data): void
-    {
-        // 进行数据处理
-        foreach ($data as $key => $value) {
-            $this->setAttr($key, $value, $data);
-        }
-    }
-
-    /**
      * 通过修改器 设置数据对象值
      * @access public
-     * @param  string $name  属性名
-     * @param  mixed  $value 属性值
-     * @param  array  $data  数据
+     * @param string $name 属性名
+     * @param mixed $value 属性值
+     * @param array $data 数据
      * @return void
      */
     public function setAttr(string $name, $value, array $data = []): void
@@ -386,102 +346,105 @@ trait Attribute
     }
 
     /**
-     * 数据写入 类型转换
-     * @access protected
-     * @param  mixed        $value 值
-     * @param  string|array $type  要转换的类型
-     * @return mixed
+     * 通过修改器 批量设置数据对象值
+     * @access public
+     * @param array $data 数据
+     * @return void
      */
-    protected function writeTransform($value, $type)
+    public function setAttrs(array $data): void
     {
-        if (is_null($value)) {
-            return;
+        // 进行数据处理
+        foreach ($data as $key => $value) {
+            $this->setAttr($key, $value, $data);
+        }
+    }
+
+    /**
+     * 设置数据字段获取器
+     * @access public
+     * @param string|array $name 字段名
+     * @param callable $callback 闭包获取器
+     * @return $this
+     */
+    public function withAttr($name, callable $callback = null)
+    {
+        if (is_array($name)) {
+            foreach ($name as $key => $val) {
+                $this->withAttr($key, $val);
+            }
+        } else {
+            $name = $this->getRealFieldName($name);
+
+            if (strpos($name, '.')) {
+                [$name, $key] = explode('.', $name);
+
+                $this->withAttr[$name][$key] = $callback;
+            } else {
+                $this->withAttr[$name] = $callback;
+            }
         }
 
-        if ($value instanceof Raw) {
+        return $this;
+    }
+
+    /**
+     * 获取JSON字段属性值
+     * @access protected
+     * @param string $name 属性名
+     * @param mixed $value JSON数据
+     * @return mixed
+     */
+    protected function getJsonValue($name, $value)
+    {
+        if (is_null($value)) {
             return $value;
         }
 
-        if (is_array($type)) {
-            [$type, $param] = $type;
-        } elseif (strpos($type, ':')) {
-            [$type, $param] = explode(':', $type, 2);
-        }
-
-        switch ($type) {
-            case 'integer':
-                $value = (int) $value;
-                break;
-            case 'float':
-                if (empty($param)) {
-                    $value = (float) $value;
-                } else {
-                    $value = (float) number_format($value, (int) $param, '.', '');
-                }
-                break;
-            case 'boolean':
-                $value = (bool) $value;
-                break;
-            case 'timestamp':
-                if (!is_numeric($value)) {
-                    $value = strtotime($value);
-                }
-                break;
-            case 'datetime':
-                $value = is_numeric($value) ? $value : strtotime($value);
-                $value = $this->formatDateTime('Y-m-d H:i:s.u', $value, true);
-                break;
-            case 'object':
-                if (is_object($value)) {
-                    $value = json_encode($value, JSON_FORCE_OBJECT);
-                }
-                break;
-            case 'array':
-                $value = (array) $value;
-                // no break
-            case 'json':
-                $option = !empty($param) ? (int) $param : JSON_UNESCAPED_UNICODE;
-                $value  = json_encode($value, $option);
-                break;
-            case 'serialize':
-                $value = serialize($value);
-                break;
-            default:
-                if (is_object($value) && false !== strpos($type, '\\') && method_exists($value, '__toString')) {
-                    // 对象类型
-                    $value = $value->__toString();
-                }
+        foreach ($this->withAttr[$name] as $key => $closure) {
+            if ($this->jsonAssoc) {
+                $value[$key] = $closure($value[$key], $value);
+            } else {
+                $value->$key = $closure($value->$key, $value);
+            }
         }
 
         return $value;
     }
 
     /**
-     * 获取器 获取数据对象的值
-     * @access public
-     * @param  string $name 名称
-     * @return mixed
-     * @throws InvalidArgumentException
+     * 获取实际的字段名
+     * @access protected
+     * @param string $name 字段名
+     * @return string
      */
-    public function getAttr(string $name)
+    protected function getRealFieldName(string $name): string
     {
-        try {
-            $relation = false;
-            $value    = $this->getData($name);
-        } catch (InvalidArgumentException $e) {
-            $relation = $this->isRelationAttr($name);
-            $value    = null;
+        if ($this->convertNameToCamel || !$this->strict) {
+            return Str::snake($name);
         }
 
-        return $this->getValue($name, $value, $relation);
+        return $name;
+    }
+
+    /**
+     * 获取关联属性值
+     * @access protected
+     * @param string $relation 关联名
+     * @return mixed
+     */
+    protected function getRelationValue(string $relation)
+    {
+        $modelRelation = $this->$relation();
+
+        return $modelRelation instanceof Relation ? $this->getRelationData($modelRelation) : null;
     }
 
     /**
      * 获取经过获取器处理后的数据对象的值
      * @access protected
-     * @param  string      $name 字段名称
-     * @param  mixed       $value 字段值
-     * @param  bool|string $relation 是否为关联属性或者关联名
+     * @param string $name 字段名称
+     * @param mixed $value 字段值
+     * @param bool|string $relation 是否为关联属性或者关联名
      * @return mixed
      * @throws InvalidArgumentException
      */
@@ -504,7 +467,7 @@ trait Attribute
                 $value = $this->getJsonValue($fieldName, $value);
             } else {
                 $closure = $this->withAttr[$fieldName];
-                if ($closure instanceof \Closure) {
+                if ($closure instanceof Closure) {
                     $value = $closure($value, $this->data);
                 }
             }
@@ -531,47 +494,29 @@ trait Attribute
     }
 
     /**
-     * 获取JSON字段属性值
-     * @access protected
-     * @param  string $name  属性名
-     * @param  mixed  $value JSON数据
-     * @return mixed
+     * 判断一个字段名是否为主键字段
+     * @access public
+     * @param string $key 名称
+     * @return bool
      */
-    protected function getJsonValue($name, $value)
+    protected function isPk(string $key): bool
     {
-        if (is_null($value)) {
-            return $value;
+        $pk = $this->getPk();
+
+        if (is_string($pk) && $pk == $key) {
+            return true;
+        } elseif (is_array($pk) && in_array($key, $pk)) {
+            return true;
         }
 
-        foreach ($this->withAttr[$name] as $key => $closure) {
-            if ($this->jsonAssoc) {
-                $value[$key] = $closure($value[$key], $value);
-            } else {
-                $value->$key = $closure($value->$key, $value);
-            }
-        }
-
-        return $value;
-    }
-
-    /**
-     * 获取关联属性值
-     * @access protected
-     * @param  string $relation 关联名
-     * @return mixed
-     */
-    protected function getRelationValue(string $relation)
-    {
-        $modelRelation = $this->$relation();
-
-        return $modelRelation instanceof Relation ? $this->getRelationData($modelRelation) : null;
+        return false;
     }
 
     /**
      * 数据读取 类型转换
      * @access protected
-     * @param  mixed        $value 值
-     * @param  string|array $type  要转换的类型
+     * @param mixed $value 值
+     * @param string|array $type 要转换的类型
      * @return mixed
      */
     protected function readTransform($value, $type)
@@ -588,28 +533,28 @@ trait Attribute
 
         switch ($type) {
             case 'integer':
-                $value = (int) $value;
+                $value = (int)$value;
                 break;
             case 'float':
                 if (empty($param)) {
-                    $value = (float) $value;
+                    $value = (float)$value;
                 } else {
-                    $value = (float) number_format($value, (int) $param, '.', '');
+                    $value = (float)number_format($value, (int)$param, '.', '');
                 }
                 break;
             case 'boolean':
-                $value = (bool) $value;
+                $value = (bool)$value;
                 break;
             case 'timestamp':
                 if (!is_null($value)) {
                     $format = !empty($param) ? $param : $this->dateFormat;
-                    $value  = $this->formatDateTime($format, $value, true);
+                    $value = $this->formatDateTime($format, $value, true);
                 }
                 break;
             case 'datetime':
                 if (!is_null($value)) {
                     $format = !empty($param) ? $param : $this->dateFormat;
-                    $value  = $this->formatDateTime($format, $value);
+                    $value = $this->formatDateTime($format, $value);
                 }
                 break;
             case 'json':
@@ -619,12 +564,12 @@ trait Attribute
                 $value = empty($value) ? [] : json_decode($value, true);
                 break;
             case 'object':
-                $value = empty($value) ? new \stdClass() : json_decode($value);
+                $value = empty($value) ? new stdClass() : json_decode($value);
                 break;
             case 'serialize':
                 try {
                     $value = unserialize($value);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $value = null;
                 }
                 break;
@@ -639,30 +584,73 @@ trait Attribute
     }
 
     /**
-     * 设置数据字段获取器
-     * @access public
-     * @param  string|array $name       字段名
-     * @param  callable     $callback   闭包获取器
-     * @return $this
+     * 数据写入 类型转换
+     * @access protected
+     * @param mixed $value 值
+     * @param string|array $type 要转换的类型
+     * @return mixed
      */
-    public function withAttr($name, callable $callback = null)
+    protected function writeTransform($value, $type)
     {
-        if (is_array($name)) {
-            foreach ($name as $key => $val) {
-                $this->withAttr($key, $val);
-            }
-        } else {
-            $name = $this->getRealFieldName($name);
-
-            if (strpos($name, '.')) {
-                [$name, $key] = explode('.', $name);
-
-                $this->withAttr[$name][$key] = $callback;
-            } else {
-                $this->withAttr[$name] = $callback;
-            }
+        if (is_null($value)) {
+            return;
         }
 
-        return $this;
+        if ($value instanceof Raw) {
+            return $value;
+        }
+
+        if (is_array($type)) {
+            [$type, $param] = $type;
+        } elseif (strpos($type, ':')) {
+            [$type, $param] = explode(':', $type, 2);
+        }
+
+        switch ($type) {
+            case 'integer':
+                $value = (int)$value;
+                break;
+            case 'float':
+                if (empty($param)) {
+                    $value = (float)$value;
+                } else {
+                    $value = (float)number_format($value, (int)$param, '.', '');
+                }
+                break;
+            case 'boolean':
+                $value = (bool)$value;
+                break;
+            case 'timestamp':
+                if (!is_numeric($value)) {
+                    $value = strtotime($value);
+                }
+                break;
+            case 'datetime':
+                $value = is_numeric($value) ? $value : strtotime($value);
+                $value = $this->formatDateTime('Y-m-d H:i:s.u', $value, true);
+                break;
+            case 'object':
+                if (is_object($value)) {
+                    $value = json_encode($value, JSON_FORCE_OBJECT);
+                }
+                break;
+            case 'array':
+                $value = (array)$value;
+            // no break
+            case 'json':
+                $option = !empty($param) ? (int)$param : JSON_UNESCAPED_UNICODE;
+                $value = json_encode($value, $option);
+                break;
+            case 'serialize':
+                $value = serialize($value);
+                break;
+            default:
+                if (is_object($value) && false !== strpos($type, '\\') && method_exists($value, '__toString')) {
+                    // 对象类型
+                    $value = $value->__toString();
+                }
+        }
+
+        return $value;
     }
 }

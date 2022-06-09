@@ -1,11 +1,12 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\response;
+namespace mftd\response;
 
-use think\Cookie;
-use think\Response;
+use Exception;
+use InvalidArgumentException;
+use mftd\Cookie;
+use mftd\Response;
 
 /**
  * Json Response
@@ -13,11 +14,10 @@ use think\Response;
 class Json extends Response
 {
     // 输出参数
+    protected $contentType = 'application/json';
     protected $options = [
         'json_encode_param' => JSON_UNESCAPED_UNICODE,
     ];
-
-    protected $contentType = 'application/json';
 
     public function __construct(Cookie $cookie, $data = '', int $code = 200)
     {
@@ -28,9 +28,9 @@ class Json extends Response
     /**
      * 处理数据
      * @access protected
-     * @param  mixed $data 要处理的数据
+     * @param mixed $data 要处理的数据
      * @return string
-     * @throws \Exception
+     * @throws Exception
      */
     protected function output($data): string
     {
@@ -39,11 +39,11 @@ class Json extends Response
             $data = json_encode($data, $this->options['json_encode_param']);
 
             if (false === $data) {
-                throw new \InvalidArgumentException(json_last_error_msg());
+                throw new InvalidArgumentException(json_last_error_msg());
             }
 
             return $data;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             if ($e->getPrevious()) {
                 throw $e->getPrevious();
             }

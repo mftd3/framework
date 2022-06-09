@@ -1,12 +1,11 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\validate;
+namespace mftd\validate;
 
 /**
  * Class ValidateRule
- * @package think\validate
+ * @package mftd\validate
  * @method ValidateRule confirm(mixed $rule, string $msg = '') static 验证是否和某个字段的值一致
  * @method ValidateRule different(mixed $rule, string $msg = '') static 验证是否和某个字段的值是否不同
  * @method ValidateRule egt(mixed $rule, string $msg = '') static 验证是否大于等于某个值
@@ -27,7 +26,7 @@ namespace think\validate;
  * @method ValidateRule allowIp(mixed $rule, string $msg = '') static 验证IP许可
  * @method ValidateRule denyIp(mixed $rule, string $msg = '') static 验证IP禁用
  * @method ValidateRule regex(mixed $rule, string $msg = '') static 使用正则验证数据
- * @method ValidateRule token(mixed $rule='__token__', string $msg = '') static 验证表单令牌
+ * @method ValidateRule token(mixed $rule = '__token__', string $msg = '') static 验证表单令牌
  * @method ValidateRule is(mixed $rule, string $msg = '') static 验证字段值是否为有效格式
  * @method ValidateRule isRequire(mixed $rule = null, string $msg = '') static 验证字段必须
  * @method ValidateRule isNumber(mixed $rule = null, string $msg = '') static 验证字段值是否为数字
@@ -67,76 +66,13 @@ namespace think\validate;
 class ValidateRule
 {
     // 验证字段的名称
-    protected $title;
+    protected $message = [];
 
     // 当前验证规则
     protected $rule = [];
 
     // 验证提示信息
-    protected $message = [];
-
-    /**
-     * 添加验证因子
-     * @access protected
-     * @param  string    $name  验证名称
-     * @param  mixed     $rule  验证规则
-     * @param  string    $msg   提示信息
-     * @return $this
-     */
-    protected function addItem(string $name, $rule = null, string $msg = '')
-    {
-        if ($rule || 0 === $rule) {
-            $this->rule[$name] = $rule;
-        } else {
-            $this->rule[] = $name;
-        }
-
-        $this->message[] = $msg;
-
-        return $this;
-    }
-
-    /**
-     * 获取验证规则
-     * @access public
-     * @return array
-     */
-    public function getRule(): array
-    {
-        return $this->rule;
-    }
-
-    /**
-     * 获取验证字段名称
-     * @access public
-     * @return string
-     */
-    public function getTitle(): string
-    {
-        return $this->title ?: '';
-    }
-
-    /**
-     * 获取验证提示
-     * @access public
-     * @return array
-     */
-    public function getMsg(): array
-    {
-        return $this->message;
-    }
-
-    /**
-     * 设置验证字段名称
-     * @access public
-     * @return $this
-     */
-    public function title(string $title)
-    {
-        $this->title = $title;
-
-        return $this;
-    }
+    protected $title;
 
     public function __call($method, $args)
     {
@@ -160,5 +96,68 @@ class ValidateRule
         array_unshift($args, lcfirst($method));
 
         return call_user_func_array([$rule, 'addItem'], $args);
+    }
+
+    /**
+     * 获取验证提示
+     * @access public
+     * @return array
+     */
+    public function getMsg(): array
+    {
+        return $this->message;
+    }
+
+    /**
+     * 获取验证规则
+     * @access public
+     * @return array
+     */
+    public function getRule(): array
+    {
+        return $this->rule;
+    }
+
+    /**
+     * 获取验证字段名称
+     * @access public
+     * @return string
+     */
+    public function getTitle(): string
+    {
+        return $this->title ?: '';
+    }
+
+    /**
+     * 设置验证字段名称
+     * @access public
+     * @return $this
+     */
+    public function title(string $title)
+    {
+        $this->title = $title;
+
+        return $this;
+    }
+
+    /**
+     * 添加验证因子
+     * @access protected
+     * @param string $name 验证名称
+     * @param mixed $rule 验证规则
+     * @param string $msg 提示信息
+     * @return $this
+     */
+    protected function addItem(string $name, $rule = null, string $msg = '')
+    {
+        if ($rule || 0 === $rule) {
+            $this->rule[$name] = $rule;
+        } else {
+            $this->rule[] = $name;
+        }
+
+        $this->message[] = $msg;
+
+        return $this;
     }
 }

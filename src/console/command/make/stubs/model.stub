@@ -3,10 +3,10 @@ declare (strict_types = 1);
 
 namespace {%namespace%};
 
-use think\Model;
+use mftd\Model;
 
 /**
- * @mixin \think\Model
+ * @mixin \mftd\Model
  */
 class {%className%} extends Model
 {

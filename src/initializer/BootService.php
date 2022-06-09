@@ -1,10 +1,9 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\initializer;
+namespace mftd\initializer;
 
-use think\App;
+use mftd\App;
 
 /**
  * 启动系统服务

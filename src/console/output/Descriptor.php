@@ -1,14 +1,15 @@
 <?php
 
-namespace think\console\output;
+namespace mftd\console\output;
 
-use think\Console;
-use think\console\Command;
-use think\console\input\Argument as InputArgument;
-use think\console\input\Definition as InputDefinition;
-use think\console\input\Option as InputOption;
-use think\console\Output;
-use think\console\output\descriptor\Console as ConsoleDescription;
+use InvalidArgumentException;
+use mftd\Console;
+use mftd\console\Command;
+use mftd\console\input\Argument as InputArgument;
+use mftd\console\input\Definition as InputDefinition;
+use mftd\console\input\Option as InputOption;
+use mftd\console\Output;
+use mftd\console\output\descriptor\Console as ConsoleDescription;
 
 class Descriptor
 {
@@ -41,141 +42,14 @@ class Descriptor
                 $this->describeConsole($object, $options);
                 break;
             default:
-                throw new \InvalidArgumentException(sprintf('Object of type "%s" is not describable.', get_class($object)));
-        }
-    }
-
-    /**
-     * 输出内容
-     * @param string $content
-     * @param bool   $decorated
-     */
-    protected function write($content, $decorated = false)
-    {
-        $this->output->write($content, false, $decorated ? Output::OUTPUT_NORMAL : Output::OUTPUT_RAW);
-    }
-
-    /**
-     * 描述参数
-     * @param InputArgument $argument
-     * @param array         $options
-     * @return string|mixed
-     */
-    protected function describeInputArgument(InputArgument $argument, array $options = [])
-    {
-        if (
-            null !== $argument->getDefault()
-            && (!is_array($argument->getDefault())
-                || count($argument->getDefault()))
-        ) {
-            $default = sprintf('<comment> [default: %s]</comment>', $this->formatDefaultValue($argument->getDefault()));
-        } else {
-            $default = '';
-        }
-
-        $totalWidth   = $options['total_width'] ?? strlen($argument->getName());
-        $spacingWidth = $totalWidth - strlen($argument->getName()) + 2;
-
-        $this->writeText(sprintf(
-            "  <info>%s</info>%s%s%s",
-            $argument->getName(),
-            str_repeat(' ', $spacingWidth), // + 17 = 2 spaces + <info> + </info> + 2 spaces
-            preg_replace('/\s*\R\s*/', PHP_EOL . str_repeat(' ', $totalWidth + 17), $argument->getDescription()),
-            $default
-        ), $options);
-    }
-
-    /**
-     * 描述选项
-     * @param InputOption $option
-     * @param array       $options
-     * @return string|mixed
-     */
-    protected function describeInputOption(InputOption $option, array $options = [])
-    {
-        if (
-            $option->acceptValue() && null !== $option->getDefault()
-            && (!is_array($option->getDefault())
-                || count($option->getDefault()))
-        ) {
-            $default = sprintf('<comment> [default: %s]</comment>', $this->formatDefaultValue($option->getDefault()));
-        } else {
-            $default = '';
-        }
-
-        $value = '';
-        if ($option->acceptValue()) {
-            $value = '=' . strtoupper($option->getName());
-
-            if ($option->isValueOptional()) {
-                $value = '[' . $value . ']';
-            }
-        }
-
-        $totalWidth = $options['total_width'] ?? $this->calculateTotalWidthForOptions([$option]);
-        $synopsis   = sprintf('%s%s', $option->getShortcut() ? sprintf('-%s, ', $option->getShortcut()) : '    ', sprintf('--%s%s', $option->getName(), $value));
-
-        $spacingWidth = $totalWidth - strlen($synopsis) + 2;
-
-        $this->writeText(sprintf(
-            "  <info>%s</info>%s%s%s%s",
-            $synopsis,
-            str_repeat(' ', $spacingWidth), // + 17 = 2 spaces + <info> + </info> + 2 spaces
-            preg_replace('/\s*\R\s*/', "\n" . str_repeat(' ', $totalWidth + 17), $option->getDescription()),
-            $default,
-            $option->isArray() ? '<comment> (multiple values allowed)</comment>' : ''
-        ), $options);
-    }
-
-    /**
-     * 描述输入
-     * @param InputDefinition $definition
-     * @param array           $options
-     * @return string|mixed
-     */
-    protected function describeInputDefinition(InputDefinition $definition, array $options = [])
-    {
-        $totalWidth = $this->calculateTotalWidthForOptions($definition->getOptions());
-        foreach ($definition->getArguments() as $argument) {
-            $totalWidth = max($totalWidth, strlen($argument->getName()));
-        }
-
-        if ($definition->getArguments()) {
-            $this->writeText('<comment>Arguments:</comment>', $options);
-            $this->writeText("\n");
-            foreach ($definition->getArguments() as $argument) {
-                $this->describeInputArgument($argument, array_merge($options, ['total_width' => $totalWidth]));
-                $this->writeText("\n");
-            }
-        }
-
-        if ($definition->getArguments() && $definition->getOptions()) {
-            $this->writeText("\n");
-        }
-
-        if ($definition->getOptions()) {
-            $laterOptions = [];
-
-            $this->writeText('<comment>Options:</comment>', $options);
-            foreach ($definition->getOptions() as $option) {
-                if (strlen($option->getShortcut()) > 1) {
-                    $laterOptions[] = $option;
-                    continue;
-                }
-                $this->writeText("\n");
-                $this->describeInputOption($option, array_merge($options, ['total_width' => $totalWidth]));
-            }
-            foreach ($laterOptions as $option) {
-                $this->writeText("\n");
-                $this->describeInputOption($option, array_merge($options, ['total_width' => $totalWidth]));
-            }
+                throw new InvalidArgumentException(sprintf('Object of type "%s" is not describable.', get_class($object)));
         }
     }
 
     /**
      * 描述指令
      * @param Command $command
-     * @param array   $options
+     * @param array $options
      * @return string|mixed
      */
     protected function describeCommand(Command $command, array $options = [])
@@ -210,13 +84,13 @@ class Descriptor
     /**
      * 描述控制台
      * @param Console $console
-     * @param array   $options
+     * @param array $options
      * @return string|mixed
      */
     protected function describeConsole(Console $console, array $options = [])
     {
         $describedNamespace = isset($options['namespace']) ? $options['namespace'] : null;
-        $description        = new ConsoleDescription($console, $describedNamespace);
+        $description = new ConsoleDescription($console, $describedNamespace);
 
         if (isset($options['raw_text']) && $options['raw_text']) {
             $width = $this->getColumnWidth($description->getNamespaces());
@@ -266,12 +140,152 @@ class Descriptor
     }
 
     /**
-     * {@inheritdoc}
+     * 描述参数
+     * @param InputArgument $argument
+     * @param array $options
+     * @return string|mixed
      */
-    private function writeText($content, array $options = [])
+    protected function describeInputArgument(InputArgument $argument, array $options = [])
     {
-        $this->write(isset($options['raw_text'])
-            && $options['raw_text'] ? strip_tags($content) : $content, isset($options['raw_output']) ? !$options['raw_output'] : true);
+        if (
+            null !== $argument->getDefault()
+            && (!is_array($argument->getDefault())
+                || count($argument->getDefault()))
+        ) {
+            $default = sprintf('<comment> [default: %s]</comment>', $this->formatDefaultValue($argument->getDefault()));
+        } else {
+            $default = '';
+        }
+
+        $totalWidth = $options['total_width'] ?? strlen($argument->getName());
+        $spacingWidth = $totalWidth - strlen($argument->getName()) + 2;
+
+        $this->writeText(sprintf(
+            "  <info>%s</info>%s%s%s",
+            $argument->getName(),
+            str_repeat(' ', $spacingWidth), // + 17 = 2 spaces + <info> + </info> + 2 spaces
+            preg_replace('/\s*\R\s*/', PHP_EOL . str_repeat(' ', $totalWidth + 17), $argument->getDescription()),
+            $default
+        ), $options);
+    }
+
+    /**
+     * 描述输入
+     * @param InputDefinition $definition
+     * @param array $options
+     * @return string|mixed
+     */
+    protected function describeInputDefinition(InputDefinition $definition, array $options = [])
+    {
+        $totalWidth = $this->calculateTotalWidthForOptions($definition->getOptions());
+        foreach ($definition->getArguments() as $argument) {
+            $totalWidth = max($totalWidth, strlen($argument->getName()));
+        }
+
+        if ($definition->getArguments()) {
+            $this->writeText('<comment>Arguments:</comment>', $options);
+            $this->writeText("\n");
+            foreach ($definition->getArguments() as $argument) {
+                $this->describeInputArgument($argument, array_merge($options, ['total_width' => $totalWidth]));
+                $this->writeText("\n");
+            }
+        }
+
+        if ($definition->getArguments() && $definition->getOptions()) {
+            $this->writeText("\n");
+        }
+
+        if ($definition->getOptions()) {
+            $laterOptions = [];
+
+            $this->writeText('<comment>Options:</comment>', $options);
+            foreach ($definition->getOptions() as $option) {
+                if (strlen($option->getShortcut()) > 1) {
+                    $laterOptions[] = $option;
+                    continue;
+                }
+                $this->writeText("\n");
+                $this->describeInputOption($option, array_merge($options, ['total_width' => $totalWidth]));
+            }
+            foreach ($laterOptions as $option) {
+                $this->writeText("\n");
+                $this->describeInputOption($option, array_merge($options, ['total_width' => $totalWidth]));
+            }
+        }
+    }
+
+    /**
+     * 描述选项
+     * @param InputOption $option
+     * @param array $options
+     * @return string|mixed
+     */
+    protected function describeInputOption(InputOption $option, array $options = [])
+    {
+        if (
+            $option->acceptValue() && null !== $option->getDefault()
+            && (!is_array($option->getDefault())
+                || count($option->getDefault()))
+        ) {
+            $default = sprintf('<comment> [default: %s]</comment>', $this->formatDefaultValue($option->getDefault()));
+        } else {
+            $default = '';
+        }
+
+        $value = '';
+        if ($option->acceptValue()) {
+            $value = '=' . strtoupper($option->getName());
+
+            if ($option->isValueOptional()) {
+                $value = '[' . $value . ']';
+            }
+        }
+
+        $totalWidth = $options['total_width'] ?? $this->calculateTotalWidthForOptions([$option]);
+        $synopsis = sprintf('%s%s', $option->getShortcut() ? sprintf('-%s, ', $option->getShortcut()) : '    ', sprintf('--%s%s', $option->getName(), $value));
+
+        $spacingWidth = $totalWidth - strlen($synopsis) + 2;
+
+        $this->writeText(sprintf(
+            "  <info>%s</info>%s%s%s%s",
+            $synopsis,
+            str_repeat(' ', $spacingWidth), // + 17 = 2 spaces + <info> + </info> + 2 spaces
+            preg_replace('/\s*\R\s*/', "\n" . str_repeat(' ', $totalWidth + 17), $option->getDescription()),
+            $default,
+            $option->isArray() ? '<comment> (multiple values allowed)</comment>' : ''
+        ), $options);
+    }
+
+    /**
+     * 输出内容
+     * @param string $content
+     * @param bool $decorated
+     */
+    protected function write($content, $decorated = false)
+    {
+        $this->output->write($content, false, $decorated ? Output::OUTPUT_NORMAL : Output::OUTPUT_RAW);
+    }
+
+    /**
+     * @param InputOption[] $options
+     * @return int
+     */
+    private function calculateTotalWidthForOptions($options)
+    {
+        $totalWidth = 0;
+        foreach ($options as $option) {
+            $nameLength = 4 + strlen($option->getName()) + 2; // - + shortcut + , + whitespace + name + --
+
+            if ($option->acceptValue()) {
+                $valueLength = 1 + strlen($option->getName()); // = + value
+                $valueLength += $option->isValueOptional() ? 2 : 0; // [ + ]
+
+                $nameLength += $valueLength;
+            }
+            $totalWidth = max($totalWidth, $nameLength);
+        }
+
+        return $totalWidth;
     }
 
     /**
@@ -303,24 +317,11 @@ class Descriptor
     }
 
     /**
-     * @param InputOption[] $options
-     * @return int
+     * {@inheritdoc}
      */
-    private function calculateTotalWidthForOptions($options)
+    private function writeText($content, array $options = [])
     {
-        $totalWidth = 0;
-        foreach ($options as $option) {
-            $nameLength = 4 + strlen($option->getName()) + 2; // - + shortcut + , + whitespace + name + --
-
-            if ($option->acceptValue()) {
-                $valueLength = 1 + strlen($option->getName()); // = + value
-                $valueLength += $option->isValueOptional() ? 2 : 0; // [ + ]
-
-                $nameLength += $valueLength;
-            }
-            $totalWidth = max($totalWidth, $nameLength);
-        }
-
-        return $totalWidth;
+        $this->write(isset($options['raw_text'])
+        && $options['raw_text'] ? strip_tags($content) : $content, isset($options['raw_output']) ? !$options['raw_output'] : true);
     }
 }

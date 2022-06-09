@@ -1,6 +1,6 @@
 <?php
 
-namespace think;
+namespace mftd;
 
 use Closure;
 use Exception;
@@ -8,11 +8,9 @@ use Throwable;
 
 class Pipeline
 {
-    protected $passable;
-
-    protected $pipes = [];
-
     protected $exceptionHandler;
+    protected $passable;
+    protected $pipes = [];
 
     /**
      * 初始数据
@@ -22,17 +20,6 @@ class Pipeline
     public function send($passable)
     {
         $this->passable = $passable;
-        return $this;
-    }
-
-    /**
-     * 调用栈
-     * @param $pipes
-     * @return $this
-     */
-    public function through($pipes)
-    {
-        $this->pipes = is_array($pipes) ? $pipes : func_get_args();
         return $this;
     }
 
@@ -49,13 +36,24 @@ class Pipeline
             function ($passable) use ($destination) {
                 try {
                     return $destination($passable);
-                } catch (Throwable | Exception $e) {
+                } catch (Throwable|Exception $e) {
                     return $this->handleException($passable, $e);
                 }
             }
         );
 
         return $pipeline($this->passable);
+    }
+
+    /**
+     * 调用栈
+     * @param $pipes
+     * @return $this
+     */
+    public function through($pipes)
+    {
+        $this->pipes = is_array($pipes) ? $pipes : func_get_args();
+        return $this;
     }
 
     /**
@@ -75,7 +73,7 @@ class Pipeline
             return function ($passable) use ($stack, $pipe) {
                 try {
                     return $pipe($passable, $stack);
-                } catch (Throwable | Exception $e) {
+                } catch (Throwable|Exception $e) {
                     return $this->handleException($passable, $e);
                 }
             };

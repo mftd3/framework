@@ -1,8 +1,7 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\db\concern;
+namespace mftd\db\concern;
 
 use PDO;
 
@@ -30,37 +29,10 @@ trait ParamsBind
     }
 
     /**
-     * 单个参数绑定
-     * @access public
-     * @param mixed   $value 绑定变量值
-     * @param integer $type  绑定类型
-     * @param string  $name  绑定标识
-     * @return string
-     */
-    public function bindValue($value, int $type = null, string $name = null)
-    {
-        $name = $name ?: 'ThinkBind_' . (count($this->bind) + 1) . '_' . mt_rand() . '_';
-
-        $this->bind[$name] = [$value, $type ?: PDO::PARAM_STR];
-        return $name;
-    }
-
-    /**
-     * 检测参数是否已经绑定
-     * @access public
-     * @param string $key 参数名
-     * @return bool
-     */
-    public function isBind($key)
-    {
-        return isset($this->bind[$key]);
-    }
-
-    /**
      * 参数绑定
      * @access public
-     * @param string $sql  绑定的sql表达式
-     * @param array  $bind 参数绑定
+     * @param string $sql 绑定的sql表达式
+     * @param array $bind 参数绑定
      * @return void
      */
     public function bindParams(string &$sql, array $bind = []): void
@@ -81,6 +53,22 @@ trait ParamsBind
     }
 
     /**
+     * 单个参数绑定
+     * @access public
+     * @param mixed $value 绑定变量值
+     * @param integer $type 绑定类型
+     * @param string $name 绑定标识
+     * @return string
+     */
+    public function bindValue($value, int $type = null, string $name = null)
+    {
+        $name = $name ?: 'mftdBind_' . (count($this->bind) + 1) . '_' . mt_rand() . '_';
+
+        $this->bind[$name] = [$value, $type ?: PDO::PARAM_STR];
+        return $name;
+    }
+
+    /**
      * 获取绑定的参数 并清空
      * @access public
      * @param bool $clear 是否清空绑定数据
@@ -94,5 +82,16 @@ trait ParamsBind
         }
 
         return $bind;
+    }
+
+    /**
+     * 检测参数是否已经绑定
+     * @access public
+     * @param string $key 参数名
+     * @return bool
+     */
+    public function isBind($key)
+    {
+        return isset($this->bind[$key]);
     }
 }

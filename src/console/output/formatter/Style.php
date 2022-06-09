@@ -1,48 +1,47 @@
 <?php
 
-namespace think\console\output\formatter;
+namespace mftd\console\output\formatter;
+
+use InvalidArgumentException;
 
 class Style
 {
-    protected static $availableForegroundColors = [
-        'black'   => ['set' => 30, 'unset' => 39],
-        'red'     => ['set' => 31, 'unset' => 39],
-        'green'   => ['set' => 32, 'unset' => 39],
-        'yellow'  => ['set' => 33, 'unset' => 39],
-        'blue'    => ['set' => 34, 'unset' => 39],
-        'magenta' => ['set' => 35, 'unset' => 39],
-        'cyan'    => ['set' => 36, 'unset' => 39],
-        'white'   => ['set' => 37, 'unset' => 39],
-    ];
-
     protected static $availableBackgroundColors = [
-        'black'   => ['set' => 40, 'unset' => 49],
-        'red'     => ['set' => 41, 'unset' => 49],
-        'green'   => ['set' => 42, 'unset' => 49],
-        'yellow'  => ['set' => 43, 'unset' => 49],
-        'blue'    => ['set' => 44, 'unset' => 49],
+        'black' => ['set' => 40, 'unset' => 49],
+        'red' => ['set' => 41, 'unset' => 49],
+        'green' => ['set' => 42, 'unset' => 49],
+        'yellow' => ['set' => 43, 'unset' => 49],
+        'blue' => ['set' => 44, 'unset' => 49],
         'magenta' => ['set' => 45, 'unset' => 49],
-        'cyan'    => ['set' => 46, 'unset' => 49],
-        'white'   => ['set' => 47, 'unset' => 49],
+        'cyan' => ['set' => 46, 'unset' => 49],
+        'white' => ['set' => 47, 'unset' => 49],
     ];
-
+    protected static $availableForegroundColors = [
+        'black' => ['set' => 30, 'unset' => 39],
+        'red' => ['set' => 31, 'unset' => 39],
+        'green' => ['set' => 32, 'unset' => 39],
+        'yellow' => ['set' => 33, 'unset' => 39],
+        'blue' => ['set' => 34, 'unset' => 39],
+        'magenta' => ['set' => 35, 'unset' => 39],
+        'cyan' => ['set' => 36, 'unset' => 39],
+        'white' => ['set' => 37, 'unset' => 39],
+    ];
     protected static $availableOptions = [
-        'bold'       => ['set' => 1, 'unset' => 22],
+        'bold' => ['set' => 1, 'unset' => 22],
         'underscore' => ['set' => 4, 'unset' => 24],
-        'blink'      => ['set' => 5, 'unset' => 25],
-        'reverse'    => ['set' => 7, 'unset' => 27],
-        'conceal'    => ['set' => 8, 'unset' => 28],
+        'blink' => ['set' => 5, 'unset' => 25],
+        'reverse' => ['set' => 7, 'unset' => 27],
+        'conceal' => ['set' => 8, 'unset' => 28],
     ];
-
-    private $foreground;
     private $background;
+    private $foreground;
     private $options = [];
 
     /**
      * 初始化输出的样式
      * @param string|null $foreground 字体颜色
      * @param string|null $background 背景色
-     * @param array       $options    格式
+     * @param array $options 格式
      * @api
      */
     public function __construct($foreground = null, $background = null, array $options = [])
@@ -59,30 +58,41 @@ class Style
     }
 
     /**
-     * 设置字体颜色
-     * @param string|null $color 颜色名
-     * @throws \InvalidArgumentException
-     * @api
+     * 应用样式到文字
+     * @param string $text 文字
+     * @return string
      */
-    public function setForeground($color = null)
+    public function apply(string $text): string
     {
-        if (null === $color) {
-            $this->foreground = null;
+        $setCodes = [];
+        $unsetCodes = [];
 
-            return;
+        if (null !== $this->foreground) {
+            $setCodes[] = $this->foreground['set'];
+            $unsetCodes[] = $this->foreground['unset'];
+        }
+        if (null !== $this->background) {
+            $setCodes[] = $this->background['set'];
+            $unsetCodes[] = $this->background['unset'];
+        }
+        if (count($this->options)) {
+            foreach ($this->options as $option) {
+                $setCodes[] = $option['set'];
+                $unsetCodes[] = $option['unset'];
+            }
         }
 
-        if (!isset(static::$availableForegroundColors[$color])) {
-            throw new \InvalidArgumentException(sprintf('Invalid foreground color specified: "%s". Expected one of (%s)', $color, implode(', ', array_keys(static::$availableForegroundColors))));
+        if (0 === count($setCodes)) {
+            return $text;
         }
 
-        $this->foreground = static::$availableForegroundColors[$color];
+        return sprintf("\033[%sm%s\033[%sm", implode(';', $setCodes), $text, implode(';', $unsetCodes));
     }
 
     /**
      * 设置背景色
      * @param string|null $color 颜色名
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      * @api
      */
     public function setBackground($color = null)
@@ -94,43 +104,47 @@ class Style
         }
 
         if (!isset(static::$availableBackgroundColors[$color])) {
-            throw new \InvalidArgumentException(sprintf('Invalid background color specified: "%s". Expected one of (%s)', $color, implode(', ', array_keys(static::$availableBackgroundColors))));
+            throw new InvalidArgumentException(sprintf('Invalid background color specified: "%s". Expected one of (%s)', $color, implode(', ', array_keys(static::$availableBackgroundColors))));
         }
 
         $this->background = static::$availableBackgroundColors[$color];
     }
 
     /**
+     * 设置字体颜色
+     * @param string|null $color 颜色名
+     * @throws InvalidArgumentException
+     * @api
+     */
+    public function setForeground($color = null)
+    {
+        if (null === $color) {
+            $this->foreground = null;
+
+            return;
+        }
+
+        if (!isset(static::$availableForegroundColors[$color])) {
+            throw new InvalidArgumentException(sprintf('Invalid foreground color specified: "%s". Expected one of (%s)', $color, implode(', ', array_keys(static::$availableForegroundColors))));
+        }
+
+        $this->foreground = static::$availableForegroundColors[$color];
+    }
+
+    /**
      * 设置字体格式
      * @param string $option 格式名
-     * @throws \InvalidArgumentException When the option name isn't defined
+     * @throws InvalidArgumentException When the option name isn't defined
      * @api
      */
     public function setOption(string $option): void
     {
         if (!isset(static::$availableOptions[$option])) {
-            throw new \InvalidArgumentException(sprintf('Invalid option specified: "%s". Expected one of (%s)', $option, implode(', ', array_keys(static::$availableOptions))));
+            throw new InvalidArgumentException(sprintf('Invalid option specified: "%s". Expected one of (%s)', $option, implode(', ', array_keys(static::$availableOptions))));
         }
 
         if (!in_array(static::$availableOptions[$option], $this->options)) {
             $this->options[] = static::$availableOptions[$option];
-        }
-    }
-
-    /**
-     * 重置字体格式
-     * @param string $option 格式名
-     * @throws \InvalidArgumentException
-     */
-    public function unsetOption(string $option): void
-    {
-        if (!isset(static::$availableOptions[$option])) {
-            throw new \InvalidArgumentException(sprintf('Invalid option specified: "%s". Expected one of (%s)', $option, implode(', ', array_keys(static::$availableOptions))));
-        }
-
-        $pos = array_search(static::$availableOptions[$option], $this->options);
-        if (false !== $pos) {
-            unset($this->options[$pos]);
         }
     }
 
@@ -148,34 +162,19 @@ class Style
     }
 
     /**
-     * 应用样式到文字
-     * @param string $text 文字
-     * @return string
+     * 重置字体格式
+     * @param string $option 格式名
+     * @throws InvalidArgumentException
      */
-    public function apply(string $text): string
+    public function unsetOption(string $option): void
     {
-        $setCodes   = [];
-        $unsetCodes = [];
-
-        if (null !== $this->foreground) {
-            $setCodes[]   = $this->foreground['set'];
-            $unsetCodes[] = $this->foreground['unset'];
-        }
-        if (null !== $this->background) {
-            $setCodes[]   = $this->background['set'];
-            $unsetCodes[] = $this->background['unset'];
-        }
-        if (count($this->options)) {
-            foreach ($this->options as $option) {
-                $setCodes[]   = $option['set'];
-                $unsetCodes[] = $option['unset'];
-            }
+        if (!isset(static::$availableOptions[$option])) {
+            throw new InvalidArgumentException(sprintf('Invalid option specified: "%s". Expected one of (%s)', $option, implode(', ', array_keys(static::$availableOptions))));
         }
 
-        if (0 === count($setCodes)) {
-            return $text;
+        $pos = array_search(static::$availableOptions[$option], $this->options);
+        if (false !== $pos) {
+            unset($this->options[$pos]);
         }
-
-        return sprintf("\033[%sm%s\033[%sm", implode(';', $setCodes), $text, implode(';', $unsetCodes));
     }
 }

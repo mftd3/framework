@@ -1,18 +1,17 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
-use think\event\HttpEnd;
-use think\event\HttpRun;
-use think\event\RouteLoaded;
-use think\exception\Handle;
+use mftd\event\HttpEnd;
+use mftd\event\HttpRun;
+use mftd\event\RouteLoaded;
+use mftd\exception\Handle;
 use Throwable;
 
 /**
  * Web应用管理类
- * @package think
+ * @package mftd
  */
 class Http
 {
@@ -20,30 +19,26 @@ class Http
      * @var App
      */
     protected $app;
-
-    /**
-     * 应用名称
-     * @var string
-     */
-    protected $name;
-
-    /**
-     * 应用路径
-     * @var string
-     */
-    protected $path;
-
-    /**
-     * 路由路径
-     * @var string
-     */
-    protected $routePath;
-
     /**
      * 是否绑定应用
      * @var bool
      */
     protected $isBind = false;
+    /**
+     * 应用名称
+     * @var string
+     */
+    protected $name;
+    /**
+     * 应用路径
+     * @var string
+     */
+    protected $path;
+    /**
+     * 路由路径
+     * @var string
+     */
+    protected $routePath;
 
     public function __construct(App $app)
     {
@@ -53,15 +48,19 @@ class Http
     }
 
     /**
-     * 设置应用名称
-     * @access public
-     * @param string $name 应用名称
-     * @return $this
+     * HttpEnd
+     * @param Response $response
+     * @return void
      */
-    public function name(string $name)
+    public function end(Response $response): void
     {
-        $this->name = $name;
-        return $this;
+        $this->app->event->trigger(HttpEnd::class, $response);
+
+        //执行中间件
+        $this->app->middleware->end($response);
+
+        // 写入日志
+        $this->app->log->save();
     }
 
     /**
@@ -72,22 +71,6 @@ class Http
     public function getName(): string
     {
         return $this->name ?: '';
-    }
-
-    /**
-     * 设置应用目录
-     * @access public
-     * @param string $path 应用目录
-     * @return $this
-     */
-    public function path(string $path)
-    {
-        if (substr($path, -1) != DIRECTORY_SEPARATOR) {
-            $path .= DIRECTORY_SEPARATOR;
-        }
-
-        $this->path = $path;
-        return $this;
     }
 
     /**
@@ -111,28 +94,6 @@ class Http
     }
 
     /**
-     * 设置路由目录
-     * @access public
-     * @param string $path 路由定义目录
-     */
-    public function setRoutePath(string $path): void
-    {
-        $this->routePath = $path;
-    }
-
-    /**
-     * 设置应用绑定
-     * @access public
-     * @param bool $bind 是否绑定
-     * @return $this
-     */
-    public function setBind(bool $bind = true)
-    {
-        $this->isBind = $bind;
-        return $this;
-    }
-
-    /**
      * 是否绑定应用
      * @access public
      * @return bool
@@ -140,6 +101,34 @@ class Http
     public function isBind(): bool
     {
         return $this->isBind;
+    }
+
+    /**
+     * 设置应用名称
+     * @access public
+     * @param string $name 应用名称
+     * @return $this
+     */
+    public function name(string $name)
+    {
+        $this->name = $name;
+        return $this;
+    }
+
+    /**
+     * 设置应用目录
+     * @access public
+     * @param string $path 应用目录
+     * @return $this
+     */
+    public function path(string $path)
+    {
+        if (substr($path, -1) != DIRECTORY_SEPARATOR) {
+            $path .= DIRECTORY_SEPARATOR;
+        }
+
+        $this->path = $path;
+        return $this;
     }
 
     /**
@@ -169,33 +158,25 @@ class Http
     }
 
     /**
-     * 初始化
+     * 设置应用绑定
+     * @access public
+     * @param bool $bind 是否绑定
+     * @return $this
      */
-    protected function initialize()
+    public function setBind(bool $bind = true)
     {
-        if (!$this->app->initialized()) {
-            $this->app->initialize();
-        }
+        $this->isBind = $bind;
+        return $this;
     }
 
     /**
-     * 执行应用程序
-     * @param Request $request
-     * @return mixed
+     * 设置路由目录
+     * @access public
+     * @param string $path 路由定义目录
      */
-    protected function runWithRequest(Request $request)
+    public function setRoutePath(string $path): void
     {
-        // 加载全局中间件
-        $this->loadMiddleware();
-
-        // 监听HttpRun
-        $this->app->event->trigger(HttpRun::class);
-
-        return $this->app->middleware->pipeline()
-            ->send($request)
-            ->then(function ($request) {
-                return $this->dispatchToRoute($request);
-            });
+        $this->routePath = $path;
     }
 
     protected function dispatchToRoute($request)
@@ -203,9 +184,19 @@ class Http
         $withRoute = $this->app->config->get('app.with_route', true) ? function () {
             $this->loadRoutes();
         }
-        : null;
+            : null;
 
         return $this->app->route->dispatch($request, $withRoute);
+    }
+
+    /**
+     * 初始化
+     */
+    protected function initialize()
+    {
+        if (!$this->app->initialized()) {
+            $this->app->initialize();
+        }
     }
 
     /**
@@ -239,6 +230,18 @@ class Http
     }
 
     /**
+     * Render the exception to a response.
+     *
+     * @param Request $request
+     * @param Throwable $e
+     * @return Response
+     */
+    protected function renderException($request, Throwable $e)
+    {
+        return $this->app->make(Handle::class)->render($request, $e);
+    }
+
+    /**
      * Report the exception to the exception handler.
      *
      * @param Throwable $e
@@ -250,30 +253,22 @@ class Http
     }
 
     /**
-     * Render the exception to a response.
-     *
-     * @param Request   $request
-     * @param Throwable $e
-     * @return Response
+     * 执行应用程序
+     * @param Request $request
+     * @return mixed
      */
-    protected function renderException($request, Throwable $e)
+    protected function runWithRequest(Request $request)
     {
-        return $this->app->make(Handle::class)->render($request, $e);
-    }
+        // 加载全局中间件
+        $this->loadMiddleware();
 
-    /**
-     * HttpEnd
-     * @param Response $response
-     * @return void
-     */
-    public function end(Response $response): void
-    {
-        $this->app->event->trigger(HttpEnd::class, $response);
+        // 监听HttpRun
+        $this->app->event->trigger(HttpRun::class);
 
-        //执行中间件
-        $this->app->middleware->end($response);
-
-        // 写入日志
-        $this->app->log->save();
+        return $this->app->middleware->pipeline()
+            ->send($request)
+            ->then(function ($request) {
+                return $this->dispatchToRoute($request);
+            });
     }
 }

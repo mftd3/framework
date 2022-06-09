@@ -1,6 +1,9 @@
 <?php
 
-namespace think\console\input;
+namespace mftd\console\input;
+
+use InvalidArgumentException;
+use LogicException;
 
 class Definition
 {
@@ -8,15 +11,13 @@ class Definition
      * @var Argument[]
      */
     private $arguments;
-
-    private $requiredCount;
     private $hasAnArrayArgument = false;
     private $hasOptional;
-
     /**
      * @var Option[]
      */
     private $options;
+    private $requiredCount;
     private $shortcuts;
 
     /**
@@ -30,36 +31,35 @@ class Definition
     }
 
     /**
-     * 设置指令的定义
-     * @param array $definition 定义的数组
+     * 添加一个参数
+     * @param Argument $argument 参数
+     * @throws LogicException
      */
-    public function setDefinition(array $definition): void
+    public function addArgument(Argument $argument): void
     {
-        $arguments = [];
-        $options   = [];
-        foreach ($definition as $item) {
-            if ($item instanceof Option) {
-                $options[] = $item;
-            } else {
-                $arguments[] = $item;
-            }
+        if (isset($this->arguments[$argument->getName()])) {
+            throw new LogicException(sprintf('An argument with name "%s" already exists.', $argument->getName()));
         }
 
-        $this->setArguments($arguments);
-        $this->setOptions($options);
-    }
+        if ($this->hasAnArrayArgument) {
+            throw new LogicException('Cannot add an argument after an array argument.');
+        }
 
-    /**
-     * 设置参数
-     * @param Argument[] $arguments 参数数组
-     */
-    public function setArguments(array $arguments = []): void
-    {
-        $this->arguments          = [];
-        $this->requiredCount      = 0;
-        $this->hasOptional        = false;
-        $this->hasAnArrayArgument = false;
-        $this->addArguments($arguments);
+        if ($argument->isRequired() && $this->hasOptional) {
+            throw new LogicException('Cannot add a required argument after an optional one.');
+        }
+
+        if ($argument->isArray()) {
+            $this->hasAnArrayArgument = true;
+        }
+
+        if ($argument->isRequired()) {
+            ++$this->requiredCount;
+        } else {
+            $this->hasOptional = true;
+        }
+
+        $this->arguments[$argument->getName()] = $argument;
     }
 
     /**
@@ -77,74 +77,63 @@ class Definition
     }
 
     /**
-     * 添加一个参数
-     * @param Argument $argument 参数
-     * @throws \LogicException
+     * 添加一个选项
+     * @param Option $option 选项
+     * @throws LogicException
+     * @api
      */
-    public function addArgument(Argument $argument): void
+    public function addOption(Option $option): void
     {
-        if (isset($this->arguments[$argument->getName()])) {
-            throw new \LogicException(sprintf('An argument with name "%s" already exists.', $argument->getName()));
+        if (isset($this->options[$option->getName()]) && !$option->equals($this->options[$option->getName()])) {
+            throw new LogicException(sprintf('An option named "%s" already exists.', $option->getName()));
         }
 
-        if ($this->hasAnArrayArgument) {
-            throw new \LogicException('Cannot add an argument after an array argument.');
+        if ($option->getShortcut()) {
+            foreach (explode('|', $option->getShortcut()) as $shortcut) {
+                if (
+                    isset($this->shortcuts[$shortcut])
+                    && !$option->equals($this->options[$this->shortcuts[$shortcut]])
+                ) {
+                    throw new LogicException(sprintf('An option with shortcut "%s" already exists.', $shortcut));
+                }
+            }
         }
 
-        if ($argument->isRequired() && $this->hasOptional) {
-            throw new \LogicException('Cannot add a required argument after an optional one.');
+        $this->options[$option->getName()] = $option;
+        if ($option->getShortcut()) {
+            foreach (explode('|', $option->getShortcut()) as $shortcut) {
+                $this->shortcuts[$shortcut] = $option->getName();
+            }
         }
+    }
 
-        if ($argument->isArray()) {
-            $this->hasAnArrayArgument = true;
+    /**
+     * 添加选项
+     * @param Option[] $options 选项数组
+     * @api
+     */
+    public function addOptions(array $options = []): void
+    {
+        foreach ($options as $option) {
+            $this->addOption($option);
         }
-
-        if ($argument->isRequired()) {
-            ++$this->requiredCount;
-        } else {
-            $this->hasOptional = true;
-        }
-
-        $this->arguments[$argument->getName()] = $argument;
     }
 
     /**
      * 根据名称或者位置获取参数
      * @param string|int $name 参数名或者位置
      * @return Argument 参数
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     public function getArgument($name): Argument
     {
         if (!$this->hasArgument($name)) {
-            throw new \InvalidArgumentException(sprintf('The "%s" argument does not exist.', $name));
+            throw new InvalidArgumentException(sprintf('The "%s" argument does not exist.', $name));
         }
 
         $arguments = is_int($name) ? array_values($this->arguments) : $this->arguments;
 
         return $arguments[$name];
-    }
-
-    /**
-     * 根据名称或位置检查是否具有某个参数
-     * @param string|int $name 参数名或者位置
-     * @return bool
-     * @api
-     */
-    public function hasArgument($name): bool
-    {
-        $arguments = is_int($name) ? array_values($this->arguments) : $this->arguments;
-
-        return isset($arguments[$name]);
-    }
-
-    /**
-     * 获取所有的参数
-     * @return Argument[] 参数数组
-     */
-    public function getArguments(): array
-    {
-        return $this->arguments;
     }
 
     /**
@@ -154,15 +143,6 @@ class Definition
     public function getArgumentCount(): int
     {
         return $this->hasAnArrayArgument ? PHP_INT_MAX : count($this->arguments);
-    }
-
-    /**
-     * 获取必填的参数的数量
-     * @return int
-     */
-    public function getArgumentRequiredCount(): int
-    {
-        return $this->requiredCount;
     }
 
     /**
@@ -180,114 +160,37 @@ class Definition
     }
 
     /**
-     * 设置选项
-     * @param Option[] $options 选项数组
+     * 获取必填的参数的数量
+     * @return int
      */
-    public function setOptions(array $options = []): void
+    public function getArgumentRequiredCount(): int
     {
-        $this->options   = [];
-        $this->shortcuts = [];
-        $this->addOptions($options);
+        return $this->requiredCount;
     }
 
     /**
-     * 添加选项
-     * @param Option[] $options 选项数组
-     * @api
+     * 获取所有的参数
+     * @return Argument[] 参数数组
      */
-    public function addOptions(array $options = []): void
+    public function getArguments(): array
     {
-        foreach ($options as $option) {
-            $this->addOption($option);
-        }
-    }
-
-    /**
-     * 添加一个选项
-     * @param Option $option 选项
-     * @throws \LogicException
-     * @api
-     */
-    public function addOption(Option $option): void
-    {
-        if (isset($this->options[$option->getName()]) && !$option->equals($this->options[$option->getName()])) {
-            throw new \LogicException(sprintf('An option named "%s" already exists.', $option->getName()));
-        }
-
-        if ($option->getShortcut()) {
-            foreach (explode('|', $option->getShortcut()) as $shortcut) {
-                if (
-                    isset($this->shortcuts[$shortcut])
-                    && !$option->equals($this->options[$this->shortcuts[$shortcut]])
-                ) {
-                    throw new \LogicException(sprintf('An option with shortcut "%s" already exists.', $shortcut));
-                }
-            }
-        }
-
-        $this->options[$option->getName()] = $option;
-        if ($option->getShortcut()) {
-            foreach (explode('|', $option->getShortcut()) as $shortcut) {
-                $this->shortcuts[$shortcut] = $option->getName();
-            }
-        }
+        return $this->arguments;
     }
 
     /**
      * 根据名称获取选项
      * @param string $name 选项名
      * @return Option
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      * @api
      */
     public function getOption(string $name): Option
     {
         if (!$this->hasOption($name)) {
-            throw new \InvalidArgumentException(sprintf('The "--%s" option does not exist.', $name));
+            throw new InvalidArgumentException(sprintf('The "--%s" option does not exist.', $name));
         }
 
         return $this->options[$name];
-    }
-
-    /**
-     * 根据名称检查是否有这个选项
-     * @param string $name 选项名
-     * @return bool
-     * @api
-     */
-    public function hasOption(string $name): bool
-    {
-        return isset($this->options[$name]);
-    }
-
-    /**
-     * 获取所有选项
-     * @return Option[]
-     * @api
-     */
-    public function getOptions(): array
-    {
-        return $this->options;
-    }
-
-    /**
-     * 根据名称检查某个选项是否有短名称
-     * @param string $name 短名称
-     * @return bool
-     */
-    public function hasShortcut(string $name): bool
-    {
-        return isset($this->shortcuts[$name]);
-    }
-
-    /**
-     * 根据短名称获取选项
-     * @param string $shortcut 短名称
-     * @return Option
-     */
-    public function getOptionForShortcut(string $shortcut): Option
-    {
-        return $this->getOption($this->shortcutToName($shortcut));
     }
 
     /**
@@ -305,18 +208,23 @@ class Definition
     }
 
     /**
-     * 根据短名称获取选项名
+     * 根据短名称获取选项
      * @param string $shortcut 短名称
-     * @return string
-     * @throws \InvalidArgumentException
+     * @return Option
      */
-    private function shortcutToName(string $shortcut): string
+    public function getOptionForShortcut(string $shortcut): Option
     {
-        if (!isset($this->shortcuts[$shortcut])) {
-            throw new \InvalidArgumentException(sprintf('The "-%s" option does not exist.', $shortcut));
-        }
+        return $this->getOption($this->shortcutToName($shortcut));
+    }
 
-        return $this->shortcuts[$shortcut];
+    /**
+     * 获取所有选项
+     * @return Option[]
+     * @api
+     */
+    public function getOptions(): array
+    {
+        return $this->options;
     }
 
     /**
@@ -337,7 +245,7 @@ class Definition
                     $value = sprintf(' %s%s%s', $option->isValueOptional() ? '[' : '', strtoupper($option->getName()), $option->isValueOptional() ? ']' : '');
                 }
 
-                $shortcut   = $option->getShortcut() ? sprintf('-%s|', $option->getShortcut()) : '';
+                $shortcut = $option->getShortcut() ? sprintf('-%s|', $option->getShortcut()) : '';
                 $elements[] = sprintf('[%s--%s%s]', $shortcut, $option->getName(), $value);
             }
         }
@@ -362,5 +270,98 @@ class Definition
         }
 
         return implode(' ', $elements);
+    }
+
+    /**
+     * 根据名称或位置检查是否具有某个参数
+     * @param string|int $name 参数名或者位置
+     * @return bool
+     * @api
+     */
+    public function hasArgument($name): bool
+    {
+        $arguments = is_int($name) ? array_values($this->arguments) : $this->arguments;
+
+        return isset($arguments[$name]);
+    }
+
+    /**
+     * 根据名称检查是否有这个选项
+     * @param string $name 选项名
+     * @return bool
+     * @api
+     */
+    public function hasOption(string $name): bool
+    {
+        return isset($this->options[$name]);
+    }
+
+    /**
+     * 根据名称检查某个选项是否有短名称
+     * @param string $name 短名称
+     * @return bool
+     */
+    public function hasShortcut(string $name): bool
+    {
+        return isset($this->shortcuts[$name]);
+    }
+
+    /**
+     * 设置参数
+     * @param Argument[] $arguments 参数数组
+     */
+    public function setArguments(array $arguments = []): void
+    {
+        $this->arguments = [];
+        $this->requiredCount = 0;
+        $this->hasOptional = false;
+        $this->hasAnArrayArgument = false;
+        $this->addArguments($arguments);
+    }
+
+    /**
+     * 设置指令的定义
+     * @param array $definition 定义的数组
+     */
+    public function setDefinition(array $definition): void
+    {
+        $arguments = [];
+        $options = [];
+        foreach ($definition as $item) {
+            if ($item instanceof Option) {
+                $options[] = $item;
+            } else {
+                $arguments[] = $item;
+            }
+        }
+
+        $this->setArguments($arguments);
+        $this->setOptions($options);
+    }
+
+    /**
+     * 设置选项
+     * @param Option[] $options 选项数组
+     */
+    public function setOptions(array $options = []): void
+    {
+        $this->options = [];
+        $this->shortcuts = [];
+        $this->addOptions($options);
+    }
+
+    /**
+     * 根据短名称获取选项名
+     * @param string $shortcut 短名称
+     * @return string
+     * @throws InvalidArgumentException
+     */
+    private function shortcutToName(string $shortcut): string
+    {
+        if (!isset($this->shortcuts[$shortcut])) {
+            throw new InvalidArgumentException(sprintf('The "-%s" option does not exist.', $shortcut));
+        }
+
+        return $this->shortcuts[$shortcut];
     }
 }

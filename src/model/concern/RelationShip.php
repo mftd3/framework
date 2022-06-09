@@ -1,27 +1,26 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\model\concern;
+namespace mftd\model\concern;
 
 use Closure;
-use think\Collection;
-use think\db\BaseQuery as Query;
-use think\db\exception\DbException as Exception;
-use think\helper\Str;
-use think\Model;
-use think\model\Relation;
-use think\model\relation\BelongsTo;
-use think\model\relation\BelongsToMany;
-use think\model\relation\HasMany;
-use think\model\relation\HasManyThrough;
-use think\model\relation\HasOne;
-use think\model\relation\HasOneThrough;
-use think\model\relation\MorphMany;
-use think\model\relation\MorphOne;
-use think\model\relation\MorphTo;
-use think\model\relation\MorphToMany;
-use think\model\relation\OneToOne;
+use mftd\Collection;
+use mftd\db\BaseQuery as Query;
+use mftd\db\exception\DbException as Exception;
+use mftd\helper\Str;
+use mftd\Model;
+use mftd\model\Relation;
+use mftd\model\relation\BelongsTo;
+use mftd\model\relation\BelongsToMany;
+use mftd\model\relation\HasMany;
+use mftd\model\relation\HasManyThrough;
+use mftd\model\relation\HasOne;
+use mftd\model\relation\HasOneThrough;
+use mftd\model\relation\MorphMany;
+use mftd\model\relation\MorphOne;
+use mftd\model\relation\MorphTo;
+use mftd\model\relation\MorphToMany;
+use mftd\model\relation\OneToOne;
 
 /**
  * 模型关联处理
@@ -29,17 +28,20 @@ use think\model\relation\OneToOne;
 trait RelationShip
 {
     /**
+     * 关联自动写入信息
+     * @var array
+     */
+    protected $relationWrite = [];
+    /**
      * 父关联模型对象
      * @var object
      */
     private $parent;
-
     /**
      * 模型关联数据
      * @var array
      */
     private $relation = [];
-
     /**
      * 关联写入定义信息
      * @var array
@@ -47,181 +49,87 @@ trait RelationShip
     private $together = [];
 
     /**
-     * 关联自动写入信息
-     * @var array
+     * BELONGS TO 关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string $foreignKey 关联外键
+     * @param string $localKey 关联主键
+     * @return BelongsTo
      */
-    protected $relationWrite = [];
+    public function belongsTo(string $model, string $foreignKey = '', string $localKey = ''): BelongsTo
+    {
+        // 记录当前关联信息
+        $model = $this->parseModel($model);
+        $foreignKey = $foreignKey ?: $this->getForeignKey((new $model())->getName());
+        $localKey = $localKey ?: (new $model())->getPk();
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        $relation = Str::snake($trace[1]['function']);
+
+        return new BelongsTo($this, $model, $foreignKey, $localKey, $relation);
+    }
 
     /**
-     * 设置父关联对象
+     * BELONGS TO MANY 关联定义
      * @access public
-     * @param  Model $model  模型对象
+     * @param string $model 模型名
+     * @param string $middle 中间表/模型名
+     * @param string $foreignKey 关联外键
+     * @param string $localKey 当前模型关联键
+     * @return BelongsToMany
+     */
+    public function belongsToMany(string $model, string $middle = '', string $foreignKey = '', string $localKey = ''): BelongsToMany
+    {
+        // 记录当前关联信息
+        $model = $this->parseModel($model);
+        $name = Str::snake(class_basename($model));
+        $middle = $middle ?: Str::snake($this->name) . '_' . $name;
+        $foreignKey = $foreignKey ?: $name . '_id';
+        $localKey = $localKey ?: $this->getForeignKey($this->name);
+
+        return new BelongsToMany($this, $model, $middle, $foreignKey, $localKey);
+    }
+
+    /**
+     * 绑定（一对一）关联属性到当前模型
+     * @access protected
+     * @param string $relation 关联名称
+     * @param array $attrs 绑定属性
      * @return $this
+     * @throws Exception
      */
-    public function setParent(Model $model)
+    public function bindAttr(string $relation, array $attrs = [])
     {
-        $this->parent = $model;
+        $relation = $this->getRelation($relation);
 
-        return $this;
-    }
+        foreach ($attrs as $key => $attr) {
+            $key = is_numeric($key) ? $attr : $key;
+            $value = $this->getOrigin($key);
 
-    /**
-     * 获取父关联对象
-     * @access public
-     * @return Model
-     */
-    public function getParent(): Model
-    {
-        return $this->parent;
-    }
-
-    /**
-     * 获取当前模型的关联模型数据
-     * @access public
-     * @param  string $name 关联方法名
-     * @param  bool   $auto 不存在是否自动获取
-     * @return mixed
-     */
-    public function getRelation(string $name = null, bool $auto = false)
-    {
-        if (is_null($name)) {
-            return $this->relation;
-        }
-
-        if (array_key_exists($name, $this->relation)) {
-            return $this->relation[$name];
-        } elseif ($auto) {
-            $relation = Str::camel($name);
-            return $this->getRelationValue($relation);
-        }
-    }
-
-    /**
-     * 设置关联数据对象值
-     * @access public
-     * @param  string $name  属性名
-     * @param  mixed  $value 属性值
-     * @param  array  $data  数据
-     * @return $this
-     */
-    public function setRelation(string $name, $value, array $data = [])
-    {
-        // 检测修改器
-        $method = 'set' . Str::studly($name) . 'Attr';
-
-        if (method_exists($this, $method)) {
-            $value = $this->$method($value, array_merge($this->data, $data));
-        }
-
-        $this->relation[$this->getRealFieldName($name)] = $value;
-
-        return $this;
-    }
-
-    /**
-     * 查询当前模型的关联数据
-     * @access public
-     * @param  array $relations 关联名
-     * @param  array $withRelationAttr   关联获取器
-     * @return void
-     */
-    public function relationQuery(array $relations, array $withRelationAttr = []): void
-    {
-        foreach ($relations as $key => $relation) {
-            $subRelation = [];
-            $closure     = null;
-
-            if ($relation instanceof Closure) {
-                // 支持闭包查询过滤关联条件
-                $closure  = $relation;
-                $relation = $key;
+            if (!is_null($value)) {
+                throw new Exception('bind attr has exists:' . $key);
             }
 
-            if (is_array($relation)) {
-                $subRelation = $relation;
-                $relation    = $key;
-            } elseif (strpos($relation, '.')) {
-                [$relation, $subRelation] = explode('.', $relation, 2);
-            }
-
-            $method       = Str::camel($relation);
-            $relationName = Str::snake($relation);
-
-            $relationResult = $this->$method();
-
-            if (isset($withRelationAttr[$relationName])) {
-                $relationResult->withAttr($withRelationAttr[$relationName]);
-            }
-
-            $this->relation[$relation] = $relationResult->getRelation((array) $subRelation, $closure);
+            $this->set($key, $relation ? $relation->$attr : null);
         }
-    }
-
-    /**
-     * 关联数据写入
-     * @access public
-     * @param  array $relation 关联
-     * @return $this
-     */
-    public function together(array $relation)
-    {
-        $this->together = $relation;
-
-        $this->checkAutoRelationWrite();
 
         return $this;
-    }
-
-    /**
-     * 根据关联条件查询当前模型
-     * @access public
-     * @param  string  $relation 关联方法名
-     * @param  mixed   $operator 比较操作符
-     * @param  integer $count    个数
-     * @param  string  $id       关联表的统计字段
-     * @param  string  $joinType JOIN类型
-     * @param  Query   $query    Query对象
-     * @return Query
-     */
-    public static function has(string $relation, string $operator = '>=', int $count = 1, string $id = '*', string $joinType = '', Query $query = null): Query
-    {
-        return (new static())
-            ->$relation()
-            ->has($operator, $count, $id, $joinType, $query);
-    }
-
-    /**
-     * 根据关联条件查询当前模型
-     * @access public
-     * @param  string $relation 关联方法名
-     * @param  mixed  $where    查询条件（数组或者闭包）
-     * @param  mixed  $fields   字段
-     * @param  string $joinType JOIN类型
-     * @param  Query  $query    Query对象
-     * @return Query
-     */
-    public static function hasWhere(string $relation, $where = [], string $fields = '*', string $joinType = '', Query $query = null): Query
-    {
-        return (new static())
-            ->$relation()
-            ->hasWhere($where, $fields, $joinType, $query);
     }
 
     /**
      * 预载入关联查询 JOIN方式
      * @access public
-     * @param  Query   $query    Query对象
-     * @param  string  $relation 关联方法名
-     * @param  mixed   $field    字段
-     * @param  string  $joinType JOIN类型
-     * @param  Closure $closure  闭包
-     * @param  bool    $first
+     * @param Query $query Query对象
+     * @param string $relation 关联方法名
+     * @param mixed $field 字段
+     * @param string $joinType JOIN类型
+     * @param Closure $closure 闭包
+     * @param bool $first
      * @return bool
      */
     public function eagerly(Query $query, string $relation, $field, string $joinType = '', Closure $closure = null, bool $first = false): bool
     {
         $relation = Str::camel($relation);
-        $class    = $this->$relation();
+        $class = $this->$relation();
 
         if ($class instanceof OneToOne) {
             $class->eagerly($query, $relation, $field, $joinType, $closure, $first);
@@ -232,77 +140,28 @@ trait RelationShip
     }
 
     /**
-     * 预载入关联查询 返回数据集
-     * @access public
-     * @param  array  $resultSet 数据集
-     * @param  string $relation  关联名
-     * @param  array  $withRelationAttr 关联获取器
-     * @param  bool   $join      是否为JOIN方式
-     * @param  mixed  $cache     关联缓存
-     * @return void
-     */
-    public function eagerlyResultSet(array &$resultSet, array $relations, array $withRelationAttr = [], bool $join = false, $cache = false): void
-    {
-        foreach ($relations as $key => $relation) {
-            $subRelation = [];
-            $closure     = null;
-
-            if ($relation instanceof Closure) {
-                $closure  = $relation;
-                $relation = $key;
-            }
-
-            if (is_array($relation)) {
-                $subRelation = $relation;
-                $relation    = $key;
-            } elseif (strpos($relation, '.')) {
-                [$relation, $subRelation] = explode('.', $relation, 2);
-
-                $subRelation = [$subRelation];
-            }
-
-            $relationName = $relation;
-            $relation     = Str::camel($relation);
-
-            $relationResult = $this->$relation();
-
-            if (isset($withRelationAttr[$relationName])) {
-                $relationResult->withAttr($withRelationAttr[$relationName]);
-            }
-
-            if (is_scalar($cache)) {
-                $relationCache = [$cache];
-            } else {
-                $relationCache = $cache[$relationName] ?? $cache;
-            }
-
-            $relationResult->eagerlyResultSet($resultSet, $relationName, $subRelation, $closure, $relationCache, $join);
-        }
-    }
-
-    /**
      * 预载入关联查询 返回模型对象
      * @access public
-     * @param  array $relations 关联
-     * @param  array $withRelationAttr 关联获取器
-     * @param  bool  $join      是否为JOIN方式
-     * @param  mixed $cache     关联缓存
+     * @param array $relations 关联
+     * @param array $withRelationAttr 关联获取器
+     * @param bool $join 是否为JOIN方式
+     * @param mixed $cache 关联缓存
      * @return void
      */
     public function eagerlyResult(array $relations, array $withRelationAttr = [], bool $join = false, $cache = false): void
     {
         foreach ($relations as $key => $relation) {
             $subRelation = [];
-            $closure     = null;
+            $closure = null;
 
             if ($relation instanceof Closure) {
-                $closure  = $relation;
+                $closure = $relation;
                 $relation = $key;
             }
 
             if (is_array($relation)) {
                 $subRelation = $relation;
-                $relation    = $key;
+                $relation = $key;
             } elseif (strpos($relation, '.')) {
                 [$relation, $subRelation] = explode('.', $relation, 2);
 
@@ -310,7 +169,7 @@ trait RelationShip
             }
 
             $relationName = $relation;
-            $relation     = Str::camel($relation);
+            $relation = Str::camel($relation);
 
             $relationResult = $this->$relation();
 
@@ -329,39 +188,358 @@ trait RelationShip
     }
 
     /**
-     * 绑定（一对一）关联属性到当前模型
-     * @access protected
-     * @param  string   $relation    关联名称
-     * @param  array    $attrs       绑定属性
-     * @return $this
-     * @throws Exception
+     * 预载入关联查询 返回数据集
+     * @access public
+     * @param array $resultSet 数据集
+     * @param string $relation 关联名
+     * @param array $withRelationAttr 关联获取器
+     * @param bool $join 是否为JOIN方式
+     * @param mixed $cache 关联缓存
+     * @return void
      */
-    public function bindAttr(string $relation, array $attrs = [])
+    public function eagerlyResultSet(array &$resultSet, array $relations, array $withRelationAttr = [], bool $join = false, $cache = false): void
     {
-        $relation = $this->getRelation($relation);
+        foreach ($relations as $key => $relation) {
+            $subRelation = [];
+            $closure = null;
 
-        foreach ($attrs as $key => $attr) {
-            $key   = is_numeric($key) ? $attr : $key;
-            $value = $this->getOrigin($key);
-
-            if (!is_null($value)) {
-                throw new Exception('bind attr has exists:' . $key);
+            if ($relation instanceof Closure) {
+                $closure = $relation;
+                $relation = $key;
             }
 
-            $this->set($key, $relation ? $relation->$attr : null);
+            if (is_array($relation)) {
+                $subRelation = $relation;
+                $relation = $key;
+            } elseif (strpos($relation, '.')) {
+                [$relation, $subRelation] = explode('.', $relation, 2);
+
+                $subRelation = [$subRelation];
+            }
+
+            $relationName = $relation;
+            $relation = Str::camel($relation);
+
+            $relationResult = $this->$relation();
+
+            if (isset($withRelationAttr[$relationName])) {
+                $relationResult->withAttr($withRelationAttr[$relationName]);
+            }
+
+            if (is_scalar($cache)) {
+                $relationCache = [$cache];
+            } else {
+                $relationCache = $cache[$relationName] ?? $cache;
+            }
+
+            $relationResult->eagerlyResultSet($resultSet, $relationName, $subRelation, $closure, $relationCache, $join);
+        }
+    }
+
+    /**
+     * 获取父关联对象
+     * @access public
+     * @return Model
+     */
+    public function getParent(): Model
+    {
+        return $this->parent;
+    }
+
+    /**
+     * 获取当前模型的关联模型数据
+     * @access public
+     * @param string $name 关联方法名
+     * @param bool $auto 不存在是否自动获取
+     * @return mixed
+     */
+    public function getRelation(string $name = null, bool $auto = false)
+    {
+        if (is_null($name)) {
+            return $this->relation;
         }
 
-        return $this;
+        if (array_key_exists($name, $this->relation)) {
+            return $this->relation[$name];
+        } elseif ($auto) {
+            $relation = Str::camel($name);
+            return $this->getRelationValue($relation);
+        }
+    }
+
+    /**
+     * 根据关联条件查询当前模型
+     * @access public
+     * @param string $relation 关联方法名
+     * @param mixed $operator 比较操作符
+     * @param integer $count 个数
+     * @param string $id 关联表的统计字段
+     * @param string $joinType JOIN类型
+     * @param Query $query Query对象
+     * @return Query
+     */
+    public static function has(string $relation, string $operator = '>=', int $count = 1, string $id = '*', string $joinType = '', Query $query = null): Query
+    {
+        return (new static())
+            ->$relation()
+            ->has($operator, $count, $id, $joinType, $query);
+    }
+
+    /**
+     * HAS MANY 关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string $foreignKey 关联外键
+     * @param string $localKey 当前主键
+     * @return HasMany
+     */
+    public function hasMany(string $model, string $foreignKey = '', string $localKey = ''): HasMany
+    {
+        // 记录当前关联信息
+        $model = $this->parseModel($model);
+        $localKey = $localKey ?: $this->getPk();
+        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
+
+        return new HasMany($this, $model, $foreignKey, $localKey);
+    }
+
+    /**
+     * HAS MANY 远程关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string $through 中间模型名
+     * @param string $foreignKey 关联外键
+     * @param string $throughKey 关联外键
+     * @param string $localKey 当前主键
+     * @param string $throughPk 中间表主键
+     * @return HasManyThrough
+     */
+    public function hasManyThrough(string $model, string $through, string $foreignKey = '', string $throughKey = '', string $localKey = '', string $throughPk = ''): HasManyThrough
+    {
+        // 记录当前关联信息
+        $model = $this->parseModel($model);
+        $through = $this->parseModel($through);
+        $localKey = $localKey ?: $this->getPk();
+        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
+        $throughKey = $throughKey ?: $this->getForeignKey((new $through())->getName());
+        $throughPk = $throughPk ?: (new $through())->getPk();
+
+        return new HasManyThrough($this, $model, $through, $foreignKey, $throughKey, $localKey, $throughPk);
+    }
+
+    /**
+     * HAS ONE 关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string $foreignKey 关联外键
+     * @param string $localKey 当前主键
+     * @return HasOne
+     */
+    public function hasOne(string $model, string $foreignKey = '', string $localKey = ''): HasOne
+    {
+        // 记录当前关联信息
+        $model = $this->parseModel($model);
+        $localKey = $localKey ?: $this->getPk();
+        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
+
+        return new HasOne($this, $model, $foreignKey, $localKey);
+    }
+
+    /**
+     * HAS ONE 远程关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string $through 中间模型名
+     * @param string $foreignKey 关联外键
+     * @param string $throughKey 关联外键
+     * @param string $localKey 当前主键
+     * @param string $throughPk 中间表主键
+     * @return HasOneThrough
+     */
+    public function hasOneThrough(string $model, string $through, string $foreignKey = '', string $throughKey = '', string $localKey = '', string $throughPk = ''): HasOneThrough
+    {
+        // 记录当前关联信息
+        $model = $this->parseModel($model);
+        $through = $this->parseModel($through);
+        $localKey = $localKey ?: $this->getPk();
+        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
+        $throughKey = $throughKey ?: $this->getForeignKey((new $through())->getName());
+        $throughPk = $throughPk ?: (new $through())->getPk();
+
+        return new HasOneThrough($this, $model, $through, $foreignKey, $throughKey, $localKey, $throughPk);
+    }
+
+    /**
+     * 根据关联条件查询当前模型
+     * @access public
+     * @param string $relation 关联方法名
+     * @param mixed $where 查询条件（数组或者闭包）
+     * @param mixed $fields 字段
+     * @param string $joinType JOIN类型
+     * @param Query $query Query对象
+     * @return Query
+     */
+    public static function hasWhere(string $relation, $where = [], string $fields = '*', string $joinType = '', Query $query = null): Query
+    {
+        return (new static())
+            ->$relation()
+            ->hasWhere($where, $fields, $joinType, $query);
+    }
+
+    /**
+     * MORPH BY MANY关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string $middle 中间表名/模型名
+     * @param string|array $morph 多态字段信息
+     * @param string $foreignKey 关联外键
+     * @return MorphToMany
+     */
+    public function morphByMany(string $model, string $middle, $morph = null, string $foreignKey = null): MorphToMany
+    {
+        if (is_null($morph)) {
+            $morph = $middle;
+        }
+
+        // 记录当前关联信息
+        if (is_array($morph)) {
+            [$morphType, $morphKey] = $morph;
+        } else {
+            $morphType = $morph . '_type';
+            $morphKey = $morph . '_id';
+        }
+
+        $model = $this->parseModel($model);
+        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
+
+        return new MorphToMany($this, $model, $middle, $morphType, $morphKey, $foreignKey, true);
+    }
+
+    /**
+     * MORPH  MANY 关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string|array $morph 多态字段信息
+     * @param string $type 多态类型
+     * @return MorphMany
+     */
+    public function morphMany(string $model, $morph = null, string $type = ''): MorphMany
+    {
+        // 记录当前关联信息
+        $model = $this->parseModel($model);
+
+        if (is_null($morph)) {
+            $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+            $morph = Str::snake($trace[1]['function']);
+        }
+
+        $type = $type ?: get_class($this);
+
+        if (is_array($morph)) {
+            [$morphType, $foreignKey] = $morph;
+        } else {
+            $morphType = $morph . '_type';
+            $foreignKey = $morph . '_id';
+        }
+
+        return new MorphMany($this, $model, $foreignKey, $morphType, $type);
+    }
+
+    /**
+     * MORPH  One 关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string|array $morph 多态字段信息
+     * @param string $type 多态类型
+     * @return MorphOne
+     */
+    public function morphOne(string $model, $morph = null, string $type = ''): MorphOne
+    {
+        // 记录当前关联信息
+        $model = $this->parseModel($model);
+
+        if (is_null($morph)) {
+            $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+            $morph = Str::snake($trace[1]['function']);
+        }
+
+        if (is_array($morph)) {
+            [$morphType, $foreignKey] = $morph;
+        } else {
+            $morphType = $morph . '_type';
+            $foreignKey = $morph . '_id';
+        }
+
+        $type = $type ?: get_class($this);
+
+        return new MorphOne($this, $model, $foreignKey, $morphType, $type);
+    }
+
+    /**
+     * MORPH TO 关联定义
+     * @access public
+     * @param string|array $morph 多态字段信息
+     * @param array $alias 多态别名定义
+     * @return MorphTo
+     */
+    public function morphTo($morph = null, array $alias = []): MorphTo
+    {
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        $relation = Str::snake($trace[1]['function']);
+
+        if (is_null($morph)) {
+            $morph = $relation;
+        }
+
+        // 记录当前关联信息
+        if (is_array($morph)) {
+            [$morphType, $foreignKey] = $morph;
+        } else {
+            $morphType = $morph . '_type';
+            $foreignKey = $morph . '_id';
+        }
+
+        return new MorphTo($this, $morphType, $foreignKey, $alias, $relation);
+    }
+
+    /**
+     * MORPH TO MANY关联定义
+     * @access public
+     * @param string $model 模型名
+     * @param string $middle 中间表名/模型名
+     * @param string|array $morph 多态字段信息
+     * @param string $localKey 当前模型关联键
+     * @return MorphToMany
+     */
+    public function morphToMany(string $model, string $middle, $morph = null, string $localKey = null): MorphToMany
+    {
+        if (is_null($morph)) {
+            $morph = $middle;
+        }
+
+        // 记录当前关联信息
+        if (is_array($morph)) {
+            [$morphType, $morphKey] = $morph;
+        } else {
+            $morphType = $morph . '_type';
+            $morphKey = $morph . '_id';
+        }
+
+        $model = $this->parseModel($model);
+        $name = Str::snake(class_basename($model));
+        $localKey = $localKey ?: $this->getForeignKey($name);
+
+        return new MorphToMany($this, $model, $middle, $morphType, $morphKey, $localKey);
     }
 
     /**
      * 关联统计
      * @access public
-     * @param  Query  $query       查询对象
-     * @param  array  $relations   关联名
-     * @param  string $aggregate   聚合查询方法
-     * @param  string $field       字段
-     * @param  bool   $useSubQuery 子查询
+     * @param Query $query 查询对象
+     * @param array $relations 关联名
+     * @param string $aggregate 聚合查询方法
+     * @param string $field 字段
+     * @param bool $useSubQuery 子查询
      * @return void
      */
     public function relationCount(Query $query, array $relations, string $aggregate = 'sum', string $field = '*', bool $useSubQuery = true): void
@@ -370,10 +548,10 @@ trait RelationShip
             $closure = $name = null;
 
             if ($relation instanceof Closure) {
-                $closure  = $relation;
+                $closure = $relation;
                 $relation = $key;
             } elseif (is_string($key)) {
-                $name     = $relation;
+                $name = $relation;
                 $relation = $key;
             }
 
@@ -398,343 +576,158 @@ trait RelationShip
     }
 
     /**
-     * HAS ONE 关联定义
+     * 查询当前模型的关联数据
      * @access public
-     * @param  string $model      模型名
-     * @param  string $foreignKey 关联外键
-     * @param  string $localKey   当前主键
-     * @return HasOne
+     * @param array $relations 关联名
+     * @param array $withRelationAttr 关联获取器
+     * @return void
      */
-    public function hasOne(string $model, string $foreignKey = '', string $localKey = ''): HasOne
+    public function relationQuery(array $relations, array $withRelationAttr = []): void
     {
-        // 记录当前关联信息
-        $model      = $this->parseModel($model);
-        $localKey   = $localKey ?: $this->getPk();
-        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
+        foreach ($relations as $key => $relation) {
+            $subRelation = [];
+            $closure = null;
 
-        return new HasOne($this, $model, $foreignKey, $localKey);
+            if ($relation instanceof Closure) {
+                // 支持闭包查询过滤关联条件
+                $closure = $relation;
+                $relation = $key;
+            }
+
+            if (is_array($relation)) {
+                $subRelation = $relation;
+                $relation = $key;
+            } elseif (strpos($relation, '.')) {
+                [$relation, $subRelation] = explode('.', $relation, 2);
+            }
+
+            $method = Str::camel($relation);
+            $relationName = Str::snake($relation);
+
+            $relationResult = $this->$method();
+
+            if (isset($withRelationAttr[$relationName])) {
+                $relationResult->withAttr($withRelationAttr[$relationName]);
+            }
+
+            $this->relation[$relation] = $relationResult->getRelation((array)$subRelation, $closure);
+        }
     }
 
     /**
-     * BELONGS TO 关联定义
+     * 移除当前模型的关联属性
      * @access public
-     * @param  string $model      模型名
-     * @param  string $foreignKey 关联外键
-     * @param  string $localKey   关联主键
-     * @return BelongsTo
+     * @return $this
      */
-    public function belongsTo(string $model, string $foreignKey = '', string $localKey = ''): BelongsTo
+    public function removeRelation()
     {
-        // 记录当前关联信息
-        $model      = $this->parseModel($model);
-        $foreignKey = $foreignKey ?: $this->getForeignKey((new $model())->getName());
-        $localKey   = $localKey ?: (new $model())->getPk();
-        $trace      = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-        $relation   = Str::snake($trace[1]['function']);
-
-        return new BelongsTo($this, $model, $foreignKey, $localKey, $relation);
+        $this->relation = [];
+        return $this;
     }
 
     /**
-     * HAS MANY 关联定义
+     * 设置父关联对象
      * @access public
-     * @param  string $model      模型名
-     * @param  string $foreignKey 关联外键
-     * @param  string $localKey   当前主键
-     * @return HasMany
+     * @param Model $model 模型对象
+     * @return $this
      */
-    public function hasMany(string $model, string $foreignKey = '', string $localKey = ''): HasMany
+    public function setParent(Model $model)
     {
-        // 记录当前关联信息
-        $model      = $this->parseModel($model);
-        $localKey   = $localKey ?: $this->getPk();
-        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
+        $this->parent = $model;
 
-        return new HasMany($this, $model, $foreignKey, $localKey);
+        return $this;
     }
 
     /**
-     * HAS MANY 远程关联定义
+     * 设置关联数据对象值
      * @access public
-     * @param  string $model      模型名
-     * @param  string $through    中间模型名
-     * @param  string $foreignKey 关联外键
-     * @param  string $throughKey 关联外键
-     * @param  string $localKey   当前主键
-     * @param  string $throughPk  中间表主键
-     * @return HasManyThrough
+     * @param string $name 属性名
+     * @param mixed $value 属性值
+     * @param array $data 数据
+     * @return $this
      */
-    public function hasManyThrough(string $model, string $through, string $foreignKey = '', string $throughKey = '', string $localKey = '', string $throughPk = ''): HasManyThrough
+    public function setRelation(string $name, $value, array $data = [])
     {
-        // 记录当前关联信息
-        $model      = $this->parseModel($model);
-        $through    = $this->parseModel($through);
-        $localKey   = $localKey ?: $this->getPk();
-        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
-        $throughKey = $throughKey ?: $this->getForeignKey((new $through())->getName());
-        $throughPk  = $throughPk ?: (new $through())->getPk();
+        // 检测修改器
+        $method = 'set' . Str::studly($name) . 'Attr';
 
-        return new HasManyThrough($this, $model, $through, $foreignKey, $throughKey, $localKey, $throughPk);
-    }
-
-    /**
-     * HAS ONE 远程关联定义
-     * @access public
-     * @param  string $model      模型名
-     * @param  string $through    中间模型名
-     * @param  string $foreignKey 关联外键
-     * @param  string $throughKey 关联外键
-     * @param  string $localKey   当前主键
-     * @param  string $throughPk  中间表主键
-     * @return HasOneThrough
-     */
-    public function hasOneThrough(string $model, string $through, string $foreignKey = '', string $throughKey = '', string $localKey = '', string $throughPk = ''): HasOneThrough
-    {
-        // 记录当前关联信息
-        $model      = $this->parseModel($model);
-        $through    = $this->parseModel($through);
-        $localKey   = $localKey ?: $this->getPk();
-        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
-        $throughKey = $throughKey ?: $this->getForeignKey((new $through())->getName());
-        $throughPk  = $throughPk ?: (new $through())->getPk();
-
-        return new HasOneThrough($this, $model, $through, $foreignKey, $throughKey, $localKey, $throughPk);
-    }
-
-    /**
-     * BELONGS TO MANY 关联定义
-     * @access public
-     * @param  string $model      模型名
-     * @param  string $middle     中间表/模型名
-     * @param  string $foreignKey 关联外键
-     * @param  string $localKey   当前模型关联键
-     * @return BelongsToMany
-     */
-    public function belongsToMany(string $model, string $middle = '', string $foreignKey = '', string $localKey = ''): BelongsToMany
-    {
-        // 记录当前关联信息
-        $model      = $this->parseModel($model);
-        $name       = Str::snake(class_basename($model));
-        $middle     = $middle ?: Str::snake($this->name) . '_' . $name;
-        $foreignKey = $foreignKey ?: $name . '_id';
-        $localKey   = $localKey ?: $this->getForeignKey($this->name);
-
-        return new BelongsToMany($this, $model, $middle, $foreignKey, $localKey);
-    }
-
-    /**
-     * MORPH  One 关联定义
-     * @access public
-     * @param  string       $model 模型名
-     * @param  string|array $morph 多态字段信息
-     * @param  string       $type  多态类型
-     * @return MorphOne
-     */
-    public function morphOne(string $model, $morph = null, string $type = ''): MorphOne
-    {
-        // 记录当前关联信息
-        $model = $this->parseModel($model);
-
-        if (is_null($morph)) {
-            $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-            $morph = Str::snake($trace[1]['function']);
+        if (method_exists($this, $method)) {
+            $value = $this->$method($value, array_merge($this->data, $data));
         }
 
-        if (is_array($morph)) {
-            [$morphType, $foreignKey] = $morph;
-        } else {
-            $morphType  = $morph . '_type';
-            $foreignKey = $morph . '_id';
-        }
+        $this->relation[$this->getRealFieldName($name)] = $value;
 
-        $type = $type ?: get_class($this);
-
-        return new MorphOne($this, $model, $foreignKey, $morphType, $type);
+        return $this;
     }
 
     /**
-     * MORPH  MANY 关联定义
+     * 关联数据写入
      * @access public
-     * @param  string       $model 模型名
-     * @param  string|array $morph 多态字段信息
-     * @param  string       $type  多态类型
-     * @return MorphMany
+     * @param array $relation 关联
+     * @return $this
      */
-    public function morphMany(string $model, $morph = null, string $type = ''): MorphMany
+    public function together(array $relation)
     {
-        // 记录当前关联信息
-        $model = $this->parseModel($model);
+        $this->together = $relation;
 
-        if (is_null($morph)) {
-            $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-            $morph = Str::snake($trace[1]['function']);
-        }
+        $this->checkAutoRelationWrite();
 
-        $type = $type ?: get_class($this);
-
-        if (is_array($morph)) {
-            [$morphType, $foreignKey] = $morph;
-        } else {
-            $morphType  = $morph . '_type';
-            $foreignKey = $morph . '_id';
-        }
-
-        return new MorphMany($this, $model, $foreignKey, $morphType, $type);
+        return $this;
     }
 
     /**
-     * MORPH TO 关联定义
-     * @access public
-     * @param  string|array $morph 多态字段信息
-     * @param  array        $alias 多态别名定义
-     * @return MorphTo
-     */
-    public function morphTo($morph = null, array $alias = []): MorphTo
-    {
-        $trace    = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-        $relation = Str::snake($trace[1]['function']);
-
-        if (is_null($morph)) {
-            $morph = $relation;
-        }
-
-        // 记录当前关联信息
-        if (is_array($morph)) {
-            [$morphType, $foreignKey] = $morph;
-        } else {
-            $morphType  = $morph . '_type';
-            $foreignKey = $morph . '_id';
-        }
-
-        return new MorphTo($this, $morphType, $foreignKey, $alias, $relation);
-    }
-
-    /**
-     * MORPH TO MANY关联定义
-     * @access public
-     * @param  string       $model 模型名
-     * @param  string       $middle 中间表名/模型名
-     * @param  string|array $morph 多态字段信息
-     * @param  string       $localKey   当前模型关联键
-     * @return MorphToMany
-     */
-    public function morphToMany(string $model, string $middle, $morph = null, string $localKey = null): MorphToMany
-    {
-        if (is_null($morph)) {
-            $morph = $middle;
-        }
-
-        // 记录当前关联信息
-        if (is_array($morph)) {
-            [$morphType, $morphKey] = $morph;
-        } else {
-            $morphType = $morph . '_type';
-            $morphKey  = $morph . '_id';
-        }
-
-        $model    = $this->parseModel($model);
-        $name     = Str::snake(class_basename($model));
-        $localKey = $localKey ?: $this->getForeignKey($name);
-
-        return new MorphToMany($this, $model, $middle, $morphType, $morphKey, $localKey);
-    }
-
-    /**
-     * MORPH BY MANY关联定义
-     * @access public
-     * @param  string       $model 模型名
-     * @param  string       $middle 中间表名/模型名
-     * @param  string|array $morph 多态字段信息
-     * @param  string       $foreignKey 关联外键
-     * @return MorphToMany
-     */
-    public function morphByMany(string $model, string $middle, $morph = null, string $foreignKey = null): MorphToMany
-    {
-        if (is_null($morph)) {
-            $morph = $middle;
-        }
-
-        // 记录当前关联信息
-        if (is_array($morph)) {
-            [$morphType, $morphKey] = $morph;
-        } else {
-            $morphType = $morph . '_type';
-            $morphKey  = $morph . '_id';
-        }
-
-        $model      = $this->parseModel($model);
-        $foreignKey = $foreignKey ?: $this->getForeignKey($this->name);
-
-        return new MorphToMany($this, $model, $middle, $morphType, $morphKey, $foreignKey, true);
-    }
-
-    /**
-     * 解析模型的完整命名空间
+     * 自动关联数据删除（支持一对一及一对多关联）
      * @access protected
-     * @param  string $model 模型名（或者完整类名）
-     * @return string
+     * @param bool $force 强制删除
+     * @return void
      */
-    protected function parseModel(string $model): string
+    protected function autoRelationDelete($force = false): void
     {
-        if (false === strpos($model, '\\')) {
-            $path = explode('\\', static::class);
-            array_pop($path);
-            array_push($path, Str::studly($model));
-            $model = implode('\\', $path);
-        }
+        foreach ($this->relationWrite as $key => $name) {
+            $name = is_numeric($key) ? $name : $key;
+            $result = $this->getRelation($name, true);
 
-        return $model;
+            if ($result instanceof Model) {
+                $result->force($force)->delete();
+            } elseif ($result instanceof Collection) {
+                foreach ($result as $model) {
+                    $model->force($force)->delete();
+                }
+            }
+        }
     }
 
     /**
-     * 获取模型的默认外键名
+     * 自动关联数据写入（针对一对一关联）
      * @access protected
-     * @param  string $name 模型名
-     * @return string
+     * @return void
      */
-    protected function getForeignKey(string $name): string
+    protected function autoRelationInsert(): void
     {
-        if (strpos($name, '\\')) {
-            $name = class_basename($name);
+        foreach ($this->relationWrite as $name => $val) {
+            $method = Str::camel($name);
+            $this->$method()->save($val);
         }
-
-        return Str::snake($name) . '_id';
     }
 
     /**
-     * 检查属性是否为关联属性 如果是则返回关联方法名
+     * 自动关联数据更新（针对一对一关联）
      * @access protected
-     * @param  string $attr 关联属性名
-     * @return string|false
+     * @return void
      */
-    protected function isRelationAttr(string $attr)
+    protected function autoRelationUpdate(): void
     {
-        $relation = Str::camel($attr);
+        foreach ($this->relationWrite as $name => $val) {
+            if ($val instanceof Model) {
+                $val->exists(true)->save();
+            } else {
+                $model = $this->getRelation($name, true);
 
-        if ((method_exists($this, $relation) && !method_exists('think\Model', $relation)) || isset(static::$macro[static::class][$relation])) {
-            return $relation;
+                if ($model instanceof Model) {
+                    $model->exists(true)->save($val);
+                }
+            }
         }
-
-        return false;
-    }
-
-    /**
-     * 智能获取关联模型数据
-     * @access protected
-     * @param  Relation $modelRelation 模型关联对象
-     * @return mixed
-     */
-    protected function getRelationData(Relation $modelRelation)
-    {
-        if (
-            $this->parent && !$modelRelation->isSelfRelation()
-            && get_class($this->parent) == get_class($modelRelation->getModel())
-        ) {
-            return $this->parent;
-        }
-
-        // 获取关联数据
-        return $modelRelation->getRelation();
     }
 
     /**
@@ -768,68 +761,71 @@ trait RelationShip
     }
 
     /**
-     * 自动关联数据更新（针对一对一关联）
+     * 获取模型的默认外键名
      * @access protected
-     * @return void
+     * @param string $name 模型名
+     * @return string
      */
-    protected function autoRelationUpdate(): void
+    protected function getForeignKey(string $name): string
     {
-        foreach ($this->relationWrite as $name => $val) {
-            if ($val instanceof Model) {
-                $val->exists(true)->save();
-            } else {
-                $model = $this->getRelation($name, true);
-
-                if ($model instanceof Model) {
-                    $model->exists(true)->save($val);
-                }
-            }
+        if (strpos($name, '\\')) {
+            $name = class_basename($name);
         }
+
+        return Str::snake($name) . '_id';
     }
 
     /**
-     * 自动关联数据写入（针对一对一关联）
+     * 智能获取关联模型数据
      * @access protected
-     * @return void
+     * @param Relation $modelRelation 模型关联对象
+     * @return mixed
      */
-    protected function autoRelationInsert(): void
+    protected function getRelationData(Relation $modelRelation)
     {
-        foreach ($this->relationWrite as $name => $val) {
-            $method = Str::camel($name);
-            $this->$method()->save($val);
+        if (
+            $this->parent && !$modelRelation->isSelfRelation()
+            && get_class($this->parent) == get_class($modelRelation->getModel())
+        ) {
+            return $this->parent;
         }
+
+        // 获取关联数据
+        return $modelRelation->getRelation();
     }
 
     /**
-     * 自动关联数据删除（支持一对一及一对多关联）
+     * 检查属性是否为关联属性 如果是则返回关联方法名
      * @access protected
-     * @param  bool $force 强制删除
-     * @return void
+     * @param string $attr 关联属性名
+     * @return string|false
      */
-    protected function autoRelationDelete($force = false): void
+    protected function isRelationAttr(string $attr)
     {
-        foreach ($this->relationWrite as $key => $name) {
-            $name   = is_numeric($key) ? $name : $key;
-            $result = $this->getRelation($name, true);
+        $relation = Str::camel($attr);
 
-            if ($result instanceof Model) {
-                $result->force($force)->delete();
-            } elseif ($result instanceof Collection) {
-                foreach ($result as $model) {
-                    $model->force($force)->delete();
-                }
-            }
+        if ((method_exists($this, $relation) && !method_exists('mftd\Model', $relation)) || isset(static::$macro[static::class][$relation])) {
+            return $relation;
         }
+
+        return false;
     }
 
     /**
-     * 移除当前模型的关联属性
-     * @access public
-     * @return $this
+     * 解析模型的完整命名空间
+     * @access protected
+     * @param string $model 模型名（或者完整类名）
+     * @return string
      */
-    public function removeRelation()
+    protected function parseModel(string $model): string
     {
-        $this->relation = [];
-        return $this;
+        if (false === strpos($model, '\\')) {
+            $path = explode('\\', static::class);
+            array_pop($path);
+            array_push($path, Str::studly($model));
+            $model = implode('\\', $path);
+        }
+
+        return $model;
     }
 }

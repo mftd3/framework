@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\service;
+namespace mftd\service;
 
-use think\Model;
-use think\Service;
+use mftd\Model;
+use mftd\Service;
 
 /**
  * 模型服务类

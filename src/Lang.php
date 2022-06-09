@@ -1,12 +1,11 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
 /**
  * 多语言管理类
- * @package think
+ * @package mftd
  */
 class Lang
 {
@@ -18,25 +17,25 @@ class Lang
      */
     protected $config = [
         // 默认语言
-        'default_lang'    => 'zh-cn',
+        'default_lang' => 'zh-cn',
         // 允许的语言列表
         'allow_lang_list' => [],
         // 是否使用Cookie记录
-        'use_cookie'      => true,
+        'use_cookie' => true,
         // 扩展语言包
-        'extend_list'     => [],
+        'extend_list' => [],
         // 多语言cookie变量
-        'cookie_var'      => 'think_lang',
+        'cookie_var' => 'mftd_lang',
         // 多语言header变量
-        'header_var'      => 'think-lang',
+        'header_var' => 'mftd-lang',
         // 多语言自动侦测变量名
-        'detect_var'      => 'lang',
+        'detect_var' => 'lang',
         // Accept-Language转义为对应语言包名称
         'accept_language' => [
             'zh-hans-cn' => 'zh-cn',
         ],
         // 是否支持语言分组
-        'allow_group'     => false,
+        'allow_group' => false,
     ];
 
     /**
@@ -59,44 +58,13 @@ class Lang
     public function __construct(App $app, array $config = [])
     {
         $this->config = array_merge($this->config, array_change_key_case($config));
-        $this->range  = $this->config['default_lang'];
-        $this->app    = $app;
+        $this->range = $this->config['default_lang'];
+        $this->app = $app;
     }
 
     public static function __make(App $app, Config $config)
     {
         return new static($app, $config->get('lang'));
-    }
-
-    /**
-     * 获取当前语言配置
-     * @access public
-     * @return array
-     */
-    public function getConfig(): array
-    {
-        return $this->config;
-    }
-
-    /**
-     * 设置当前语言
-     * @access public
-     * @param string $lang 语言
-     * @return void
-     */
-    public function setLangSet(string $lang): void
-    {
-        $this->range = $lang;
-    }
-
-    /**
-     * 获取当前语言
-     * @access public
-     * @return string
-     */
-    public function getLangSet(): string
-    {
-        return $this->range;
     }
 
     /**
@@ -110,128 +78,51 @@ class Lang
     }
 
     /**
-     * 切换语言
+     * 自动侦测设置获取语言选择
+     * @param Request $request
+     * @return string
+     * @deprecated
      * @access public
-     * @param string $langset 语言
-     * @return void
      */
-    public function switchLangSet(string $langset)
+    public function detect(Request $request): string
     {
-        if (empty($langset)) {
-            return;
-        }
+        // 自动侦测设置获取语言选择
+        $langSet = '';
 
-        $this->setLangSet($langset);
-
-        // 加载系统语言包
-        $this->load([
-            $this->app->getThinkPath() . 'lang' . DIRECTORY_SEPARATOR . $langset . '.php',
-        ]);
-
-        // 加载系统语言包
-        $files = glob($this->app->getAppPath() . 'lang' . DIRECTORY_SEPARATOR . $langset . '.*');
-        $this->load($files);
-
-        // 加载扩展（自定义）语言包
-        $list = $this->app->config->get('lang.extend_list', []);
-
-        if (isset($list[$langset])) {
-            $this->load($list[$langset]);
-        }
-    }
-
-    /**
-     * 加载语言定义(不区分大小写)
-     * @access public
-     * @param string|array $file  语言文件
-     * @param string       $range 语言作用域
-     * @return array
-     */
-    public function load($file, $range = ''): array
-    {
-        $range = $range ?: $this->range;
-        if (!isset($this->lang[$range])) {
-            $this->lang[$range] = [];
-        }
-
-        $lang = [];
-
-        foreach ((array) $file as $name) {
-            if (is_file($name)) {
-                $result = $this->parse($name);
-                $lang   = array_change_key_case($result) + $lang;
+        if ($request->get($this->config['detect_var'])) {
+            // url中设置了语言变量
+            $langSet = strtolower($request->get($this->config['detect_var']));
+        } elseif ($request->header($this->config['header_var'])) {
+            // Header中设置了语言变量
+            $langSet = strtolower($request->header($this->config['header_var']));
+        } elseif ($request->cookie($this->config['cookie_var'])) {
+            // Cookie中设置了语言变量
+            $langSet = strtolower($request->cookie($this->config['cookie_var']));
+        } elseif ($request->server('HTTP_ACCEPT_LANGUAGE')) {
+            // 自动侦测浏览器语言
+            $match = preg_match('/^([a-z\d\-]+)/i', $request->server('HTTP_ACCEPT_LANGUAGE'), $matches);
+            if ($match) {
+                $langSet = strtolower($matches[1]);
+                if (isset($this->config['accept_language'][$langSet])) {
+                    $langSet = $this->config['accept_language'][$langSet];
+                }
             }
         }
 
-        if (!empty($lang)) {
-            $this->lang[$range] = $lang + $this->lang[$range];
+        if (empty($this->config['allow_lang_list']) || in_array($langSet, $this->config['allow_lang_list'])) {
+            // 合法的语言
+            $this->range = $langSet;
         }
 
-        return $this->lang[$range];
-    }
-
-    /**
-     * 解析语言文件
-     * @access protected
-     * @param string $file 语言文件名
-     * @return array
-     */
-    protected function parse(string $file): array
-    {
-        $type = pathinfo($file, PATHINFO_EXTENSION);
-
-        switch ($type) {
-            case 'php':
-                $result = include $file;
-                break;
-            case 'yml':
-            case 'yaml':
-                if (function_exists('yaml_parse_file')) {
-                    $result = yaml_parse_file($file);
-                }
-                break;
-            case 'json':
-                $data = file_get_contents($file);
-
-                if (false !== $data) {
-                    $data = json_decode($data, true);
-
-                    if (json_last_error() === JSON_ERROR_NONE) {
-                        $result = $data;
-                    }
-                }
-
-                break;
-        }
-
-        return isset($result) && is_array($result) ? $result : [];
-    }
-
-    /**
-     * 判断是否存在语言定义(不区分大小写)
-     * @access public
-     * @param string|null $name  语言变量
-     * @param string      $range 语言作用域
-     * @return bool
-     */
-    public function has(string $name, string $range = ''): bool
-    {
-        $range = $range ?: $this->range;
-
-        if ($this->config['allow_group'] && strpos($name, '.')) {
-            [$name1, $name2] = explode('.', $name, 2);
-            return isset($this->lang[$range][strtolower($name1)][$name2]);
-        }
-
-        return isset($this->lang[$range][strtolower($name)]);
+        return $this->range;
     }
 
     /**
      * 获取语言定义(不区分大小写)
      * @access public
-     * @param string|null $name  语言变量
-     * @param array       $vars  变量替换
-     * @param string      $range 语言作用域
+     * @param string|null $name 语言变量
+     * @param array $vars 变量替换
+     * @param string $range 语言作用域
      * @return mixed
      */
     public function get(string $name = null, array $vars = [], string $range = '')
@@ -280,56 +171,164 @@ class Lang
     }
 
     /**
-     * 自动侦测设置获取语言选择
-     * @deprecated
+     * 获取当前语言配置
      * @access public
-     * @param Request $request
+     * @return array
+     */
+    public function getConfig(): array
+    {
+        return $this->config;
+    }
+
+    /**
+     * 获取当前语言
+     * @access public
      * @return string
      */
-    public function detect(Request $request): string
+    public function getLangSet(): string
     {
-        // 自动侦测设置获取语言选择
-        $langSet = '';
-
-        if ($request->get($this->config['detect_var'])) {
-            // url中设置了语言变量
-            $langSet = strtolower($request->get($this->config['detect_var']));
-        } elseif ($request->header($this->config['header_var'])) {
-            // Header中设置了语言变量
-            $langSet = strtolower($request->header($this->config['header_var']));
-        } elseif ($request->cookie($this->config['cookie_var'])) {
-            // Cookie中设置了语言变量
-            $langSet = strtolower($request->cookie($this->config['cookie_var']));
-        } elseif ($request->server('HTTP_ACCEPT_LANGUAGE')) {
-            // 自动侦测浏览器语言
-            $match = preg_match('/^([a-z\d\-]+)/i', $request->server('HTTP_ACCEPT_LANGUAGE'), $matches);
-            if ($match) {
-                $langSet = strtolower($matches[1]);
-                if (isset($this->config['accept_language'][$langSet])) {
-                    $langSet = $this->config['accept_language'][$langSet];
-                }
-            }
-        }
-
-        if (empty($this->config['allow_lang_list']) || in_array($langSet, $this->config['allow_lang_list'])) {
-            // 合法的语言
-            $this->range = $langSet;
-        }
-
         return $this->range;
     }
 
     /**
-     * 保存当前语言到Cookie
-     * @deprecated
+     * 判断是否存在语言定义(不区分大小写)
      * @access public
+     * @param string|null $name 语言变量
+     * @param string $range 语言作用域
+     * @return bool
+     */
+    public function has(string $name, string $range = ''): bool
+    {
+        $range = $range ?: $this->range;
+
+        if ($this->config['allow_group'] && strpos($name, '.')) {
+            [$name1, $name2] = explode('.', $name, 2);
+            return isset($this->lang[$range][strtolower($name1)][$name2]);
+        }
+
+        return isset($this->lang[$range][strtolower($name)]);
+    }
+
+    /**
+     * 加载语言定义(不区分大小写)
+     * @access public
+     * @param string|array $file 语言文件
+     * @param string $range 语言作用域
+     * @return array
+     */
+    public function load($file, $range = ''): array
+    {
+        $range = $range ?: $this->range;
+        if (!isset($this->lang[$range])) {
+            $this->lang[$range] = [];
+        }
+
+        $lang = [];
+
+        foreach ((array)$file as $name) {
+            if (is_file($name)) {
+                $result = $this->parse($name);
+                $lang = array_change_key_case($result) + $lang;
+            }
+        }
+
+        if (!empty($lang)) {
+            $this->lang[$range] = $lang + $this->lang[$range];
+        }
+
+        return $this->lang[$range];
+    }
+
+    /**
+     * 保存当前语言到Cookie
      * @param Cookie $cookie Cookie对象
      * @return void
+     * @deprecated
+     * @access public
      */
     public function saveToCookie(Cookie $cookie)
     {
         if ($this->config['use_cookie']) {
             $cookie->set($this->config['cookie_var'], $this->range);
         }
+    }
+
+    /**
+     * 设置当前语言
+     * @access public
+     * @param string $lang 语言
+     * @return void
+     */
+    public function setLangSet(string $lang): void
+    {
+        $this->range = $lang;
+    }
+
+    /**
+     * 切换语言
+     * @access public
+     * @param string $langset 语言
+     * @return void
+     */
+    public function switchLangSet(string $langset)
+    {
+        if (empty($langset)) {
+            return;
+        }
+
+        $this->setLangSet($langset);
+
+        // 加载系统语言包
+        $this->load([
+            $this->app->getmftdPath() . 'lang' . DIRECTORY_SEPARATOR . $langset . '.php',
+        ]);
+
+        // 加载系统语言包
+        $files = glob($this->app->getAppPath() . 'lang' . DIRECTORY_SEPARATOR . $langset . '.*');
+        $this->load($files);
+
+        // 加载扩展（自定义）语言包
+        $list = $this->app->config->get('lang.extend_list', []);
+
+        if (isset($list[$langset])) {
+            $this->load($list[$langset]);
+        }
+    }
+
+    /**
+     * 解析语言文件
+     * @access protected
+     * @param string $file 语言文件名
+     * @return array
+     */
+    protected function parse(string $file): array
+    {
+        $type = pathinfo($file, PATHINFO_EXTENSION);
+
+        switch ($type) {
+            case 'php':
+                $result = include $file;
+                break;
+            case 'yml':
+            case 'yaml':
+                if (function_exists('yaml_parse_file')) {
+                    $result = yaml_parse_file($file);
+                }
+                break;
+            case 'json':
+                $data = file_get_contents($file);
+
+                if (false !== $data) {
+                    $data = json_decode($data, true);
+
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $result = $data;
+                    }
+                }
+
+                break;
+        }
+
+        return isset($result) && is_array($result) ? $result : [];
     }
 }

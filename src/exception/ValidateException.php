@@ -1,19 +1,20 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\exception;
+namespace mftd\exception;
+
+use RuntimeException;
 
 /**
  * 数据验证异常
  */
-class ValidateException extends \RuntimeException
+class ValidateException extends RuntimeException
 {
     protected $error;
 
     public function __construct($error)
     {
-        $this->error   = $error;
+        $this->error = $error;
         $this->message = is_array($error) ? implode(PHP_EOL, $error) : $error;
     }
 

@@ -1,16 +1,24 @@
 <?php
 
-namespace think\console\command;
+namespace mftd\console\command;
 
-use think\console\Command;
-use think\console\Input;
-use think\console\input\Argument as InputArgument;
-use think\console\input\Definition as InputDefinition;
-use think\console\input\Option as InputOption;
-use think\console\Output;
+use mftd\console\Command;
+use mftd\console\Input;
+use mftd\console\input\Argument as InputArgument;
+use mftd\console\input\Definition as InputDefinition;
+use mftd\console\input\Option as InputOption;
+use mftd\console\Output;
 
 class Lists extends Command
 {
+    /**
+     * {@inheritdoc}
+     */
+    public function getNativeDefinition(): InputDefinition
+    {
+        return $this->createDefinition();
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -36,18 +44,10 @@ EOF
     /**
      * {@inheritdoc}
      */
-    public function getNativeDefinition(): InputDefinition
-    {
-        return $this->createDefinition();
-    }
-
-    /**
-     * {@inheritdoc}
-     */
     protected function execute(Input $input, Output $output)
     {
         $output->describe($this->getConsole(), [
-            'raw_text'  => $input->getOption('raw'),
+            'raw_text' => $input->getOption('raw'),
             'namespace' => $input->getArgument('namespace'),
         ]);
     }

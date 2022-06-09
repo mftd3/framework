@@ -1,17 +1,16 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\route\dispatch;
+namespace mftd\route\dispatch;
 
+use mftd\App;
+use mftd\exception\ClassNotFoundException;
+use mftd\exception\HttpException;
+use mftd\helper\Str;
+use mftd\route\Dispatch;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
-use think\App;
-use think\exception\ClassNotFoundException;
-use think\exception\HttpException;
-use think\helper\Str;
-use think\route\Dispatch;
 
 /**
  * Controller Dispatcher
@@ -19,44 +18,39 @@ use think\route\Dispatch;
 class Controller extends Dispatch
 {
     /**
+     * 操作名
+     * @var string
+     */
+    protected $actionName;
+    /**
      * 控制器名
      * @var string
      */
     protected $controller;
 
     /**
-     * 操作名
-     * @var string
+     * 实例化访问控制器
+     * @access public
+     * @param string $name 资源地址
+     * @return object
+     * @throws ClassNotFoundException
      */
-    protected $actionName;
-
-    public function init(App $app)
+    public function controller(string $name)
     {
-        parent::init($app);
+        $suffix = $this->rule->config('controller_suffix') ? 'Controller' : '';
 
-        $result = $this->dispatch;
+        $controllerLayer = $this->rule->config('controller_layer') ?: 'controller';
+        $emptyController = $this->rule->config('empty_controller') ?: 'Error';
 
-        if (is_string($result)) {
-            $result = explode('/', $result);
+        $class = $this->app->parseClass($controllerLayer, $name . $suffix);
+
+        if (class_exists($class)) {
+            return $this->app->make($class, [], true);
+        } elseif ($emptyController && class_exists($emptyClass = $this->app->parseClass($controllerLayer, $emptyController . $suffix))) {
+            return $this->app->make($emptyClass, [], true);
         }
 
-        // 获取控制器名
-        $controller = strip_tags($result[0] ?: $this->rule->config('default_controller'));
-
-        if (strpos($controller, '.')) {
-            $pos              = strrpos($controller, '.');
-            $this->controller = substr($controller, 0, $pos) . '.' . Str::studly(substr($controller, $pos + 1));
-        } else {
-            $this->controller = Str::studly($controller);
-        }
-
-        // 获取操作名
-        $this->actionName = strip_tags($result[1] ?: $this->rule->config('default_action'));
-
-        // 设置当前请求的控制器、操作
-        $this->request
-            ->setController($this->controller)
-            ->setAction($this->actionName);
+        throw new ClassNotFoundException('class not exists:' . $class, $class);
     }
 
     public function exec()
@@ -91,7 +85,7 @@ class Controller extends Dispatch
                         $this->request->setAction($actionName);
                     } catch (ReflectionException $e) {
                         $reflect = new ReflectionMethod($instance, '__call');
-                        $vars    = [$action, $vars];
+                        $vars = [$action, $vars];
                         $this->request->setAction($action);
                     }
                 } else {
@@ -103,6 +97,35 @@ class Controller extends Dispatch
 
                 return $this->autoResponse($data);
             });
+    }
+
+    public function init(App $app)
+    {
+        parent::init($app);
+
+        $result = $this->dispatch;
+
+        if (is_string($result)) {
+            $result = explode('/', $result);
+        }
+
+        // 获取控制器名
+        $controller = strip_tags($result[0] ?: $this->rule->config('default_controller'));
+
+        if (strpos($controller, '.')) {
+            $pos = strrpos($controller, '.');
+            $this->controller = substr($controller, 0, $pos) . '.' . Str::studly(substr($controller, $pos + 1));
+        } else {
+            $this->controller = Str::studly($controller);
+        }
+
+        // 获取操作名
+        $this->actionName = strip_tags($result[1] ?: $this->rule->config('default_action'));
+
+        // 设置当前请求的控制器、操作
+        $this->request
+            ->setController($this->controller)
+            ->setAction($this->actionName);
     }
 
     protected function parseActions($actions)
@@ -127,18 +150,18 @@ class Controller extends Dispatch
             $reflectionProperty->setAccessible(true);
 
             $middlewares = $reflectionProperty->getValue($controller);
-            $action      = $this->request->action(true);
+            $action = $this->request->action(true);
 
             foreach ($middlewares as $key => $val) {
                 if (!is_int($key)) {
                     $middleware = $key;
-                    $options    = $val;
+                    $options = $val;
                 } elseif (isset($val['middleware'])) {
                     $middleware = $val['middleware'];
-                    $options    = $val['options'] ?? [];
+                    $options = $val['options'] ?? [];
                 } else {
                     $middleware = $val;
-                    $options    = [];
+                    $options = [];
                 }
 
                 if (isset($options['only']) && !in_array($action, $this->parseActions($options['only']))) {
@@ -157,30 +180,5 @@ class Controller extends Dispatch
                 $this->app->middleware->controller($middleware);
             }
         }
-    }
-
-    /**
-     * 实例化访问控制器
-     * @access public
-     * @param string $name 资源地址
-     * @return object
-     * @throws ClassNotFoundException
-     */
-    public function controller(string $name)
-    {
-        $suffix = $this->rule->config('controller_suffix') ? 'Controller' : '';
-
-        $controllerLayer = $this->rule->config('controller_layer') ?: 'controller';
-        $emptyController = $this->rule->config('empty_controller') ?: 'Error';
-
-        $class = $this->app->parseClass($controllerLayer, $name . $suffix);
-
-        if (class_exists($class)) {
-            return $this->app->make($class, [], true);
-        } elseif ($emptyController && class_exists($emptyClass = $this->app->parseClass($controllerLayer, $emptyController . $suffix))) {
-            return $this->app->make($emptyClass, [], true);
-        }
-
-        throw new ClassNotFoundException('class not exists:' . $class, $class);
     }
 }

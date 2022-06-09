@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\service;
+namespace mftd\service;
 
-use think\Service;
-use think\Validate;
+use mftd\Service;
+use mftd\Validate;
 
 /**
  * 验证服务类

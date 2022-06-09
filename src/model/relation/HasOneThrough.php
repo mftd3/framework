@@ -1,10 +1,9 @@
 <?php
 
-namespace think\model\relation;
+namespace mftd\model\relation;
 
 use Closure;
-use think\helper\Str;
-use think\Model;
+use mftd\Model;
 
 /**
  * 远程一对一关联类
@@ -12,44 +11,51 @@ use think\Model;
 class HasOneThrough extends HasManyThrough
 {
     /**
-     * 延迟获取关联数据
-     * @access public
-     * @param  array   $subRelation 子关联名
-     * @param  Closure $closure     闭包查询条件
-     * @return Model
+     * 预载入关联查询（数据）
+     * @access protected
+     * @param Model $result 数据对象
+     * @param string $relation 当前关联名
+     * @param array $subRelation 子关联名
+     * @param Closure $closure 闭包
+     * @param array $cache 关联缓存
+     * @return void
      */
-    public function getRelation(array $subRelation = [], Closure $closure = null)
+    public function eagerlyResult(Model $result, string $relation, array $subRelation = [], Closure $closure = null, array $cache = []): void
     {
-        if ($closure) {
-            $closure($this->getClosureType($closure));
-        }
+        $localKey = $this->localKey;
+        $foreignKey = $this->foreignKey;
 
-        $this->baseQuery();
+        $this->query->removeWhereField($foreignKey);
 
-        $relationModel = $this->query->relation($subRelation)->find();
+        $data = $this->eagerlyWhere([
+            [$foreignKey, '=', $result->$localKey],
+        ], $foreignKey, $subRelation, $closure, $cache);
 
-        if ($relationModel) {
-            $relationModel->setParent(clone $this->parent);
-        } else {
+        // 关联模型
+        if (!isset($data[$result->$localKey])) {
             $relationModel = $this->getDefaultModel();
+        } else {
+            $relationModel = $data[$result->$localKey];
+            $relationModel->setParent(clone $result);
+            $relationModel->exists(true);
         }
 
-        return $relationModel;
+        $result->setRelation($relation, $relationModel);
     }
 
     /**
      * 预载入关联查询（数据集）
      * @access protected
-     * @param  array   $resultSet   数据集
-     * @param  string  $relation    当前关联名
-     * @param  array   $subRelation 子关联名
-     * @param  Closure $closure     闭包
-     * @param  array   $cache       关联缓存
+     * @param array $resultSet 数据集
+     * @param string $relation 当前关联名
+     * @param array $subRelation 子关联名
+     * @param Closure $closure 闭包
+     * @param array $cache 关联缓存
      * @return void
      */
     public function eagerlyResultSet(array &$resultSet, string $relation, array $subRelation = [], Closure $closure = null, array $cache = []): void
     {
-        $localKey   = $this->localKey;
+        $localKey = $this->localKey;
         $foreignKey = $this->foreignKey;
 
         $range = [];
@@ -85,46 +91,39 @@ class HasOneThrough extends HasManyThrough
     }
 
     /**
-     * 预载入关联查询（数据）
-     * @access protected
-     * @param  Model   $result      数据对象
-     * @param  string  $relation    当前关联名
-     * @param  array   $subRelation 子关联名
-     * @param  Closure $closure     闭包
-     * @param  array   $cache       关联缓存
-     * @return void
+     * 延迟获取关联数据
+     * @access public
+     * @param array $subRelation 子关联名
+     * @param Closure $closure 闭包查询条件
+     * @return Model
      */
-    public function eagerlyResult(Model $result, string $relation, array $subRelation = [], Closure $closure = null, array $cache = []): void
+    public function getRelation(array $subRelation = [], Closure $closure = null)
     {
-        $localKey   = $this->localKey;
-        $foreignKey = $this->foreignKey;
-
-        $this->query->removeWhereField($foreignKey);
-
-        $data = $this->eagerlyWhere([
-            [$foreignKey, '=', $result->$localKey],
-        ], $foreignKey, $subRelation, $closure, $cache);
-
-        // 关联模型
-        if (!isset($data[$result->$localKey])) {
-            $relationModel = $this->getDefaultModel();
-        } else {
-            $relationModel = $data[$result->$localKey];
-            $relationModel->setParent(clone $result);
-            $relationModel->exists(true);
+        if ($closure) {
+            $closure($this->getClosureType($closure));
         }
 
-        $result->setRelation($relation, $relationModel);
+        $this->baseQuery();
+
+        $relationModel = $this->query->relation($subRelation)->find();
+
+        if ($relationModel) {
+            $relationModel->setParent(clone $this->parent);
+        } else {
+            $relationModel = $this->getDefaultModel();
+        }
+
+        return $relationModel;
     }
 
     /**
      * 关联模型预查询
      * @access public
-     * @param  array   $where       关联预查询条件
-     * @param  string  $key         关联键名
-     * @param  array   $subRelation 子关联
-     * @param  Closure $closure
-     * @param  array   $cache       关联缓存
+     * @param array $where 关联预查询条件
+     * @param string $key 关联键名
+     * @param array $subRelation 子关联
+     * @param Closure $closure
+     * @param array $cache 关联缓存
      * @return array
      */
     protected function eagerlyWhere(array $where, string $key, array $subRelation = [], Closure $closure = null, array $cache = []): array

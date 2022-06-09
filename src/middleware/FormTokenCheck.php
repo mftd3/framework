@@ -1,13 +1,12 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\middleware;
+namespace mftd\middleware;
 
 use Closure;
-use think\exception\ValidateException;
-use think\Request;
-use think\Response;
+use mftd\exception\ValidateException;
+use mftd\Request;
+use mftd\Response;
 
 /**
  * 表单令牌支持
@@ -19,7 +18,7 @@ class FormTokenCheck
      * @access public
      * @param Request $request
      * @param Closure $next
-     * @param string  $token 表单令牌Token名称
+     * @param string $token 表单令牌Token名称
      * @return Response
      */
     public function handle(Request $request, Closure $next, string $token = null)

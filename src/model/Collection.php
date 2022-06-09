@@ -1,36 +1,51 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think\model;
+namespace mftd\model;
 
-use think\Collection as BaseCollection;
-use think\Model;
-use think\Paginator;
+use mftd\Collection as BaseCollection;
+use mftd\Model;
+use mftd\Paginator;
 
 /**
  * 模型数据集类
  *
  * @template TKey of array-key
- * @template TModel of \think\Model
+ * @template TModel of \mftd\Model
  *
  * @extends BaseCollection<TKey, TModel>
  */
 class Collection extends BaseCollection
 {
     /**
-     * 延迟预载入关联查询
+     * 设置需要追加的输出属性
      * @access public
-     * @param  array|string $relation 关联
-     * @param  mixed        $cache    关联缓存
+     * @param array $append 属性列表
+     * @param bool $merge 是否合并
      * @return $this
      */
-    public function load($relation, $cache = false)
+    public function append(array $append, bool $merge = false)
     {
-        if (!$this->isEmpty()) {
-            $item = current($this->items);
-            $item->eagerlyResultSet($this->items, (array) $relation, [], false, $cache);
-        }
+        $this->each(function (Model $model) use ($append, $merge) {
+            $model->append($append, $merge);
+        });
+
+        return $this;
+    }
+
+    /**
+     * 绑定（一对一）关联属性到当前模型
+     * @access protected
+     * @param string $relation 关联名称
+     * @param array $attrs 绑定属性
+     * @return $this
+     * @throws Exception
+     */
+    public function bindAttr(string $relation, array $attrs = [])
+    {
+        $this->each(function (Model $model) use ($relation, $attrs) {
+            $model->bindAttr($relation, $attrs);
+        });
 
         return $this;
     }
@@ -50,141 +65,10 @@ class Collection extends BaseCollection
     }
 
     /**
-     * 更新数据
-     * @access public
-     * @param array $data       数据数组
-     * @param array $allowField 允许字段
-     * @return bool
-     */
-    public function update(array $data, array $allowField = []): bool
-    {
-        $this->each(function (Model $model) use ($data, $allowField) {
-            if (!empty($allowField)) {
-                $model->allowField($allowField);
-            }
-
-            $model->save($data);
-        });
-
-        return true;
-    }
-
-    /**
-     * 设置需要隐藏的输出属性
-     * @access public
-     * @param  array $hidden 属性列表
-     * @param  bool  $merge  是否合并
-     * @return $this
-     */
-    public function hidden(array $hidden, bool $merge = false)
-    {
-        $this->each(function (Model $model) use ($hidden, $merge) {
-            $model->hidden($hidden, $merge);
-        });
-
-        return $this;
-    }
-
-    /**
-     * 设置需要输出的属性
-     * @access public
-     * @param  array $visible
-     * @param  bool  $merge    是否合并
-     * @return $this
-     */
-    public function visible(array $visible, bool $merge = false)
-    {
-        $this->each(function (Model $model) use ($visible, $merge) {
-            $model->visible($visible, $merge);
-        });
-
-        return $this;
-    }
-
-    /**
-     * 设置需要追加的输出属性
-     * @access public
-     * @param  array $append 属性列表
-     * @param  bool  $merge  是否合并
-     * @return $this
-     */
-    public function append(array $append, bool $merge = false)
-    {
-        $this->each(function (Model $model) use ($append, $merge) {
-            $model->append($append, $merge);
-        });
-
-        return $this;
-    }
-
-    /**
-     * 设置模型输出场景
-     * @access public
-     * @param  string $scene   场景名称
-     * @return $this
-     */
-    public function scene(string $scene)
-    {
-        $this->each(function (Model $model) use ($scene) {
-            $model->scene($scene);
-        });
-
-        return $this;
-    }
-
-    /**
-     * 设置父模型
-     * @access public
-     * @param  Model $parent 父模型
-     * @return $this
-     */
-    public function setParent(Model $parent)
-    {
-        $this->each(function (Model $model) use ($parent) {
-            $model->setParent($parent);
-        });
-
-        return $this;
-    }
-
-    /**
-     * 设置数据字段获取器
-     * @access public
-     * @param  string|array $name       字段名
-     * @param  callable     $callback   闭包获取器
-     * @return $this
-     */
-    public function withAttr($name, $callback = null)
-    {
-        $this->each(function (Model $model) use ($name, $callback) {
-            $model->withAttr($name, $callback);
-        });
-
-        return $this;
-    }
-
-    /**
-     * 绑定（一对一）关联属性到当前模型
-     * @access protected
-     * @param  string $relation 关联名称
-     * @param  array  $attrs    绑定属性
-     * @return $this
-     * @throws Exception
-     */
-    public function bindAttr(string $relation, array $attrs = [])
-    {
-        $this->each(function (Model $model) use ($relation, $attrs) {
-            $model->bindAttr($relation, $attrs);
-        });
-
-        return $this;
-    }
-
-    /**
      * 按指定键整理数据
      *
      * @access public
-     * @param mixed       $items    数据
+     * @param mixed $items 数据
      * @param string|null $indexKey 键名
      * @return array
      */
@@ -211,7 +95,7 @@ class Collection extends BaseCollection
      * 比较数据集，返回差集
      *
      * @access public
-     * @param mixed       $items    数据
+     * @param mixed $items 数据
      * @param string|null $indexKey 指定比较的键名
      * @return static
      */
@@ -221,7 +105,7 @@ class Collection extends BaseCollection
             return new static($items);
         }
 
-        $diff       = [];
+        $diff = [];
         $dictionary = $this->dictionary($items, $indexKey);
 
         if (is_string($indexKey)) {
@@ -236,10 +120,26 @@ class Collection extends BaseCollection
     }
 
     /**
+     * 设置需要隐藏的输出属性
+     * @access public
+     * @param array $hidden 属性列表
+     * @param bool $merge 是否合并
+     * @return $this
+     */
+    public function hidden(array $hidden, bool $merge = false)
+    {
+        $this->each(function (Model $model) use ($hidden, $merge) {
+            $model->hidden($hidden, $merge);
+        });
+
+        return $this;
+    }
+
+    /**
      * 比较数据集，返回交集
      *
      * @access public
-     * @param mixed       $items    数据
+     * @param mixed $items 数据
      * @param string|null $indexKey 指定比较的键名
      * @return static
      */
@@ -249,7 +149,7 @@ class Collection extends BaseCollection
             return new static([]);
         }
 
-        $intersect  = [];
+        $intersect = [];
         $dictionary = $this->dictionary($items, $indexKey);
 
         if (is_string($indexKey)) {
@@ -261,5 +161,104 @@ class Collection extends BaseCollection
         }
 
         return new static($intersect);
+    }
+
+    /**
+     * 延迟预载入关联查询
+     * @access public
+     * @param array|string $relation 关联
+     * @param mixed $cache 关联缓存
+     * @return $this
+     */
+    public function load($relation, $cache = false)
+    {
+        if (!$this->isEmpty()) {
+            $item = current($this->items);
+            $item->eagerlyResultSet($this->items, (array)$relation, [], false, $cache);
+        }
+
+        return $this;
+    }
+
+    /**
+     * 设置模型输出场景
+     * @access public
+     * @param string $scene 场景名称
+     * @return $this
+     */
+    public function scene(string $scene)
+    {
+        $this->each(function (Model $model) use ($scene) {
+            $model->scene($scene);
+        });
+
+        return $this;
+    }
+
+    /**
+     * 设置父模型
+     * @access public
+     * @param Model $parent 父模型
+     * @return $this
+     */
+    public function setParent(Model $parent)
+    {
+        $this->each(function (Model $model) use ($parent) {
+            $model->setParent($parent);
+        });
+
+        return $this;
+    }
+
+    /**
+     * 更新数据
+     * @access public
+     * @param array $data 数据数组
+     * @param array $allowField 允许字段
+     * @return bool
+     */
+    public function update(array $data, array $allowField = []): bool
+    {
+        $this->each(function (Model $model) use ($data, $allowField) {
+            if (!empty($allowField)) {
+                $model->allowField($allowField);
+            }
+
+            $model->save($data);
+        });
+
+        return true;
+    }
+
+    /**
+     * 设置需要输出的属性
+     * @access public
+     * @param array $visible
+     * @param bool $merge 是否合并
+     * @return $this
+     */
+    public function visible(array $visible, bool $merge = false)
+    {
+        $this->each(function (Model $model) use ($visible, $merge) {
+            $model->visible($visible, $merge);
+        });
+
+        return $this;
+    }
+
+    /**
+     * 设置数据字段获取器
+     * @access public
+     * @param string|array $name 字段名
+     * @param callable $callback 闭包获取器
+     * @return $this
+     */
+    public function withAttr($name, $callback = null)
+    {
+        $this->each(function (Model $model) use ($name, $callback) {
+            $model->withAttr($name, $callback);
+        });
+
+        return $this;
     }
 }

@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
 
-namespace think;
+namespace mftd;
 
 use Closure;
-use think\event\RouteLoaded;
+use mftd\event\RouteLoaded;
 
 /**
  * 系统服务基础类
@@ -19,6 +18,20 @@ abstract class Service
     public function __construct(App $app)
     {
         $this->app = $app;
+    }
+
+    /**
+     * 添加指令
+     * @access protected
+     * @param array|string $commands 指令
+     */
+    protected function commands($commands)
+    {
+        $commands = is_array($commands) ? $commands : func_get_args();
+
+        Console::starting(function (Console $console) use ($commands) {
+            $console->addCommands($commands);
+        });
     }
 
     /**
@@ -40,19 +53,5 @@ abstract class Service
     protected function registerRoutes(Closure $closure)
     {
         $this->app->event->listen(RouteLoaded::class, $closure);
-    }
-
-    /**
-     * 添加指令
-     * @access protected
-     * @param array|string $commands 指令
-     */
-    protected function commands($commands)
-    {
-        $commands = is_array($commands) ? $commands : func_get_args();
-
-        Console::starting(function (Console $console) use ($commands) {
-            $console->addCommands($commands);
-        });
     }
 }

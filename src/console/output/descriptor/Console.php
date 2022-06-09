@@ -1,60 +1,58 @@
 <?php
 
-namespace think\console\output\descriptor;
+namespace mftd\console\output\descriptor;
 
-use think\Console as ThinkConsole;
-use think\console\Command;
+use InvalidArgumentException;
+use mftd\Console as mftdConsole;
+use mftd\console\Command;
 
 class Console
 {
     public const GLOBAL_NAMESPACE = '_global';
-
     /**
-     * @var ThinkConsole
+     * @var Command[]
+     */
+    private $aliases;
+    /**
+     * @var Command[]
+     */
+    private $commands;
+    /**
+     * @var mftdConsole
      */
     private $console;
-
     /**
      * @var null|string
      */
     private $namespace;
-
     /**
      * @var array
      */
     private $namespaces;
 
     /**
-     * @var Command[]
-     */
-    private $commands;
-
-    /**
-     * @var Command[]
-     */
-    private $aliases;
-
-    /**
      * 构造方法
-     * @param ThinkConsole $console
-     * @param string|null  $namespace
+     * @param mftdConsole $console
+     * @param string|null $namespace
      */
-    public function __construct(ThinkConsole $console, $namespace = null)
+    public function __construct(mftdConsole $console, $namespace = null)
     {
-        $this->console   = $console;
+        $this->console = $console;
         $this->namespace = $namespace;
     }
 
     /**
-     * @return array
+     * @param string $name
+     * @return Command
+     * @throws InvalidArgumentException
      */
-    public function getNamespaces(): array
+    public function getCommand(string $name): Command
     {
-        if (null === $this->namespaces) {
-            $this->inspectConsole();
+        if (!isset($this->commands[$name]) && !isset($this->aliases[$name])) {
+            throw new InvalidArgumentException(sprintf('Command %s does not exist.', $name));
         }
 
-        return $this->namespaces;
+        return $this->commands[$name] ?? $this->aliases[$name];
     }
 
     /**
@@ -70,22 +68,20 @@ class Console
     }
 
     /**
-     * @param string $name
-     * @return Command
-     * @throws \InvalidArgumentException
+     * @return array
      */
-    public function getCommand(string $name): Command
+    public function getNamespaces(): array
     {
-        if (!isset($this->commands[$name]) && !isset($this->aliases[$name])) {
-            throw new \InvalidArgumentException(sprintf('Command %s does not exist.', $name));
+        if (null === $this->namespaces) {
+            $this->inspectConsole();
         }
 
-        return $this->commands[$name] ?? $this->aliases[$name];
+        return $this->namespaces;
     }
 
     private function inspectConsole(): void
     {
-        $this->commands   = [];
+        $this->commands = [];
         $this->namespaces = [];
 
         $all = $this->console->all($this->namespace ? $this->console->findNamespace($this->namespace) : null);

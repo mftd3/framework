@@ -1,18 +1,19 @@
 <?php
 
-namespace think\console\output\formatter;
+namespace mftd\console\output\formatter;
+
+use InvalidArgumentException;
 
 class Stack
 {
     /**
-     * @var Style[]
-     */
-    private $styles;
-
-    /**
      * @var Style
      */
     private $emptyStyle;
+    /**
+     * @var Style[]
+     */
+    private $styles;
 
     /**
      * 构造方法
@@ -22,54 +23,6 @@ class Stack
     {
         $this->emptyStyle = $emptyStyle ?: new Style();
         $this->reset();
-    }
-
-    /**
-     * 重置堆栈
-     */
-    public function reset(): void
-    {
-        $this->styles = [];
-    }
-
-    /**
-     * 推一个样式进入堆栈
-     * @param Style $style
-     */
-    public function push(Style $style): void
-    {
-        $this->styles[] = $style;
-    }
-
-    /**
-     * 从堆栈中弹出一个样式
-     * @param Style|null $style
-     * @return Style
-     * @throws \InvalidArgumentException
-     */
-    public function pop(Style $style = null): Style
-    {
-        if (empty($this->styles)) {
-            return $this->emptyStyle;
-        }
-
-        if (null === $style) {
-            return array_pop($this->styles);
-        }
-
-        /**
-         * @var int   $index
-         * @var Style $stackedStyle
-         */
-        foreach (array_reverse($this->styles, true) as $index => $stackedStyle) {
-            if ($style->apply('') === $stackedStyle->apply('')) {
-                $this->styles = array_slice($this->styles, 0, $index);
-
-                return $stackedStyle;
-            }
-        }
-
-        throw new \InvalidArgumentException('Incorrectly nested style tag found.');
     }
 
     /**
@@ -86,6 +39,62 @@ class Stack
     }
 
     /**
+     * @return Style
+     */
+    public function getEmptyStyle(): Style
+    {
+        return $this->emptyStyle;
+    }
+
+    /**
+     * 从堆栈中弹出一个样式
+     * @param Style|null $style
+     * @return Style
+     * @throws InvalidArgumentException
+     */
+    public function pop(Style $style = null): Style
+    {
+        if (empty($this->styles)) {
+            return $this->emptyStyle;
+        }
+
+        if (null === $style) {
+            return array_pop($this->styles);
+        }
+
+        /**
+         * @var int $index
+         * @var Style $stackedStyle
+         */
+        foreach (array_reverse($this->styles, true) as $index => $stackedStyle) {
+            if ($style->apply('') === $stackedStyle->apply('')) {
+                $this->styles = array_slice($this->styles, 0, $index);
+
+                return $stackedStyle;
+            }
+        }
+
+        throw new InvalidArgumentException('Incorrectly nested style tag found.');
+    }
+
+    /**
+     * 推一个样式进入堆栈
+     * @param Style $style
+     */
+    public function push(Style $style): void
+    {
+        $this->styles[] = $style;
+    }
+
+    /**
+     * 重置堆栈
+     */
+    public function reset(): void
+    {
+        $this->styles = [];
+    }
+
+    /**
      * @param Style $emptyStyle
      * @return Stack
      */
@@ -94,13 +103,5 @@ class Stack
         $this->emptyStyle = $emptyStyle;
 
         return $this;
-    }
-
-    /**
-     * @return Style
-     */
-    public function getEmptyStyle(): Style
-    {
-        return $this->emptyStyle;
     }
 }
